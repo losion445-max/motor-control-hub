@@ -1,5 +1,20 @@
 
 services:
   backend:
+    restart: always
+    container_name: motor-control-hub-backend
     build:
       context: ./backend
+    
+  frontend:
+    restart: always
+    depends_on:
+      - backend
+    build:
+      context: ./frontend
+    ports:
+      - "8080:80"
+
+networks:
+  default:
+    name: motor-control-hub-net
