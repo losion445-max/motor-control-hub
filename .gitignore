@@ -1,0 +1,41 @@
+# --- IDE / OS ---
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+.history/
+
+# --- Frontend (Node/Vite) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.eslintcache
+
+# --- Backend (Go) ---
+backend/vendor/
+backend/application
+backend/*.exe
+backend/*.exe~
+backend/*.dll
+backend/*.so
+backend/*.dylib
+backend/*.test
+backend/out/
+backend/.env
+
+# --- Docker ---
+.docker/
+# Если хранишь данные БД или логов в вольюмах:
+docker-data/
+*.log
+
+# --- System / Arch Linux specific ---
+*~
+.fuse_hidden*
+.directory
