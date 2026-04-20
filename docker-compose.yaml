@@ -5,6 +5,7 @@ services:
     container_name: motor-control-hub-backend
     build:
       context: ./backend
+    network_mode: "host"
     
   frontend:
     restart: always

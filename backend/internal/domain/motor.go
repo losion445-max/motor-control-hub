@@ -29,3 +29,7 @@ type IMotor interface {
 	Stop(ctx context.Context) error
 	GetStatus(ctx context.Context) (*MotorStatus, error)
 }
+
+type MotorDiscover interface {
+	Discover(ctx context.Context) ([]MotorConfig, error)
+}
