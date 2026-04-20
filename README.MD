@@ -16,3 +16,8 @@
 ```bash
 docker compose up --build
 ```
+
+## Сделано
+
+### Инициализация
+Го бекенд + vite + rect + ts через nginx прокси на 80 порт
