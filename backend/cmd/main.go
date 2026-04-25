@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -28,4 +29,24 @@ func main() {
 		status, _ := m.GetStatus(ctx)
 		log.Printf("[MAIN] Motor %d is at position %d", status.MotorID, status.CurrentSteps)
 	}
+
+	kinematics, err := usecase.NewKinematicsService(10, 10, motors)
+	if err != nil {
+		log.Fatalf("[MAIN] Failed to initialize Kinematics service: %v", err)
+	}
+
+	motorOrchestrator := usecase.NewMotorOrchestrator(motors, kinematics)
+
+	c, err := motorOrchestrator.GetAllAggregatedConfig(ctx)
+	if err != nil {
+		log.Fatalf("[MAIN] Failed to get aggregated config %v", err)
+	}
+	s, err := motorOrchestrator.GetAllAggregatedStatus(ctx)
+	if err != nil {
+		log.Fatalf("[MAIN] Failed to get aggregated status: %v", err)
+	}
+
+	fmt.Println(c)
+	fmt.Println(s)
+
 }
