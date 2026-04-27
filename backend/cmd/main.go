@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/losion445-max/motor-control-hub/internal/infrastructure/network"
@@ -37,16 +37,11 @@ func main() {
 
 	motorOrchestrator := usecase.NewMotorOrchestrator(motors, kinematics)
 
-	c, err := motorOrchestrator.GetAllAggregatedConfig(ctx)
-	if err != nil {
-		log.Fatalf("[MAIN] Failed to get aggregated config %v", err)
-	}
-	s, err := motorOrchestrator.GetAllAggregatedStatus(ctx)
-	if err != nil {
-		log.Fatalf("[MAIN] Failed to get aggregated status: %v", err)
-	}
+	mux := http.NewServeMux()
+	handler := network.NewMotorHandler(motorOrchestrator)
+	handler.MapRoutes(mux)
 
-	fmt.Println(c)
-	fmt.Println(s)
+	log.Println("Control Hub listening on :8080")
+	log.Fatal(http.ListenAndServe(":8080", mux))
 
 }
