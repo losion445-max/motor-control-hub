@@ -13,6 +13,10 @@ type MotorOrchestrator struct {
 	kinematics *KinematicsService
 }
 
+func (m *MotorOrchestrator) GoHome(ctx context.Context, speed float64) error {
+	return m.kinematics.GoHome(ctx, speed)
+}
+
 func (m *MotorOrchestrator) GetFrameHeight() float64 {
 	return m.kinematics.Height
 }

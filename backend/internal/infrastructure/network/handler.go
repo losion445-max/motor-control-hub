@@ -150,3 +150,32 @@ func (h *MotorHandler) handleConfig(w http.ResponseWriter, r *http.Request) {
 		log.Printf("[HTTP] Error encoding config: %v", err)
 	}
 }
+
+func (h *MotorHandler) handleGoHome(w http.ResponseWriter, r *http.Request) {
+	// 1. Decode speed from the request
+	var req struct {
+		Speed float64 `json:"speed"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON. Expected: {\"speed\": float}", http.StatusBadRequest)
+		return
+	}
+
+	// 2. Validate
+	if req.Speed <= 0 {
+		http.Error(w, "Speed must be positive", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.orchestrator.GoHome(r.Context(), req.Speed); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to go home: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":  "success",
+		"message": "Moving to home position (0,0)",
+	})
+}

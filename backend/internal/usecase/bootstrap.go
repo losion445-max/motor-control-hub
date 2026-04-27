@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"slices"
 
 	"github.com/losion445-max/motor-control-hub/internal/domain"
 	"github.com/losion445-max/motor-control-hub/internal/infrastructure/esp32"
@@ -15,13 +17,25 @@ func BootstrapMotors(ctx context.Context, scanner domain.MotorDiscover) ([]domai
 		return nil, err
 	}
 
-	log.Printf("[BOOTSTRAP] Found only %d motors!", len(configs))
+	if len(configs) != 4 {
+		return nil, fmt.Errorf("[BOOTSTRAP] critical error: expected 4 motors, found %d", len(configs))
+	}
 
 	var motors []domain.IMotor
 	for _, cfg := range configs {
 		motors = append(motors, esp32.NewMotorClient(cfg))
 	}
 
-	log.Println("[BOOTStRAP] Motors were successfully initialized!")
+	slices.SortFunc(motors, func(a, b domain.IMotor) int {
+		return a.GetConfig().MotorID - b.GetConfig().MotorID
+	})
+
+	for i, m := range motors {
+		if m.GetConfig().MotorID != i {
+			return nil, fmt.Errorf("[BOOTSTRAP] sequence error: expected motor ID %d at index %d, but got ID %d", i, i, m.GetConfig().MotorID)
+		}
+	}
+
+	log.Println("[BOOTStRAP] Motors were successfully initialized and mapped to corners!")
 	return motors, nil
 }
