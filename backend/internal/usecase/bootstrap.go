@@ -31,7 +31,7 @@ func BootstrapMotors(ctx context.Context, scanner domain.MotorDiscover) ([]domai
 	})
 
 	for i, m := range motors {
-		if m.GetConfig().MotorID != i {
+		if m.GetConfig().MotorID != (i + 1) {
 			return nil, fmt.Errorf("[BOOTSTRAP] sequence error: expected motor ID %d at index %d, but got ID %d", i, i, m.GetConfig().MotorID)
 		}
 	}
