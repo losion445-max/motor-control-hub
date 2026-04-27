@@ -73,3 +73,14 @@ func (m *MotorOrchestrator) EmergencyStop(ctx context.Context) error {
 func (m *MotorOrchestrator) Calibrate(ctx context.Context, speed float64) error {
 	return m.kinematics.Calibrate(ctx, speed)
 }
+
+// internal/usecase/orchestrator.go
+
+func (m *MotorOrchestrator) GetCurrentPosition() domain.Point {
+	return m.kinematics.currentPosition
+}
+
+func (m *MotorOrchestrator) IsCalibrated() bool {
+	// Logic to check if Calibrate() has been called successfully
+	return m.kinematics.currentPosition != (domain.Point{})
+}
