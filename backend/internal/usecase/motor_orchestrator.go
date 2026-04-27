@@ -61,3 +61,15 @@ func (m *MotorOrchestrator) GetAllAggregatedStatus(ctx context.Context) ([]*doma
 
 	return statuses, nil
 }
+
+func (m *MotorOrchestrator) MoveToPoint(ctx context.Context, x, y, speed float64) error {
+	return m.kinematics.MoveTo(ctx, domain.Point{X: x, Y: y}, speed)
+}
+
+func (m *MotorOrchestrator) EmergencyStop(ctx context.Context) error {
+	return m.kinematics.StopAll(ctx)
+}
+
+func (m *MotorOrchestrator) Calibrate(ctx context.Context, speed float64) error {
+	return m.kinematics.Calibrate(ctx, speed)
+}
