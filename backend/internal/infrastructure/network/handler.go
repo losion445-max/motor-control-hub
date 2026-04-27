@@ -20,9 +20,12 @@ func NewMotorHandler(orc *usecase.MotorOrchestrator) *MotorHandler {
 }
 
 func (h *MotorHandler) MapRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/config", h.handleConfig)
 	mux.HandleFunc("POST /api/move", h.handleMove)
 	mux.HandleFunc("GET /api/status", h.handleStatus)
 	mux.HandleFunc("POST /api/calibrate", h.handleCalibrate)
+	mux.HandleFunc("POST /api/stop", h.handleEmergencyStop)
+
 }
 
 func (h *MotorHandler) handleMove(w http.ResponseWriter, r *http.Request) {
@@ -121,5 +124,29 @@ func (h *MotorHandler) handleEmergencyStop(w http.ResponseWriter, r *http.Reques
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		log.Printf("[HTTP] Error encoding response: %v", err)
+	}
+}
+
+func (h *MotorHandler) handleConfig(w http.ResponseWriter, r *http.Request) {
+	motorConfigs, err := h.orchestrator.GetAllAggregatedConfig(r.Context())
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to fetch motor configs: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	response := struct {
+		FrameWidth  float64              `json:"frame_width"`
+		FrameHeight float64              `json:"frame_height"`
+		Motors      []domain.MotorConfig `json:"motors"`
+	}{
+		FrameWidth:  h.orchestrator.GetFrameWidth(),
+		FrameHeight: h.orchestrator.GetFrameHeight(),
+		Motors:      motorConfigs,
+	}
+
+	// 3. Send response
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("[HTTP] Error encoding config: %v", err)
 	}
 }

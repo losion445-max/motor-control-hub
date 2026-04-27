@@ -13,6 +13,14 @@ type MotorOrchestrator struct {
 	kinematics *KinematicsService
 }
 
+func (m *MotorOrchestrator) GetFrameHeight() float64 {
+	return m.kinematics.Height
+}
+
+func (m *MotorOrchestrator) GetFrameWidth() float64 {
+	return m.kinematics.Width
+}
+
 func NewMotorOrchestrator(motors []domain.IMotor, kinematics *KinematicsService) *MotorOrchestrator {
 	if len(motors) != 4 {
 		log.Panicf("Connected motors must be 4!")
