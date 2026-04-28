@@ -9,8 +9,8 @@ services:
     
   frontend:
     restart: always
-    depends_on:
-      - backend
+    # depends_on:
+    #   - backend
     build:
       context: ./frontend
     ports:
