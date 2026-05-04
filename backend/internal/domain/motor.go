@@ -24,7 +24,7 @@ type MotorStatus struct {
 }
 
 type IMotor interface {
-	GetConfig() MotorConfig
+	GetConfig(ctx context.Context) (*MotorConfig, error)
 	Move(ctx context.Context, steps int, speed float64) error
 	Stop(ctx context.Context) error
 	GetStatus(ctx context.Context) (*MotorStatus, error)

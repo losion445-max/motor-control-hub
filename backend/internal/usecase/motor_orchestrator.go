@@ -13,10 +13,6 @@ type MotorOrchestrator struct {
 	kinematics *KinematicsService
 }
 
-func (m *MotorOrchestrator) GoHome(ctx context.Context, speed float64) error {
-	return m.kinematics.GoHome(ctx, speed)
-}
-
 func (m *MotorOrchestrator) GetFrameHeight() float64 {
 	return m.kinematics.Height
 }
@@ -39,7 +35,12 @@ func NewMotorOrchestrator(motors []domain.IMotor, kinematics *KinematicsService)
 func (m *MotorOrchestrator) GetAllAggregatedConfig(ctx context.Context) ([]domain.MotorConfig, error) {
 	configs := make([]domain.MotorConfig, len(m.motors))
 	for i, config := range m.motors {
-		configs[i] = config.GetConfig()
+		conf, err := config.GetConfig(ctx)
+		configs[i] = *conf
+		if err == nil {
+			configs[i] = domain.MotorConfig{}
+		}
+
 	}
 
 	return configs, nil
@@ -86,13 +87,14 @@ func (m *MotorOrchestrator) Calibrate(ctx context.Context, speed float64) error 
 	return m.kinematics.Calibrate(ctx, speed)
 }
 
-// internal/usecase/orchestrator.go
-
 func (m *MotorOrchestrator) GetCurrentPosition() domain.Point {
 	return m.kinematics.currentPosition
 }
 
 func (m *MotorOrchestrator) IsCalibrated() bool {
-	// Logic to check if Calibrate() has been called successfully
 	return m.kinematics.currentPosition != (domain.Point{})
+}
+
+func (m *MotorOrchestrator) GoHome(ctx context.Context, speed float64) error {
+	return m.kinematics.MoveTo(ctx, domain.Point{X: 0, Y: 0}, speed)
 }

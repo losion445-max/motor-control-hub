@@ -15,25 +15,51 @@ type response struct {
 }
 
 type MotorClient struct {
-	config domain.MotorConfig
+	config *domain.MotorConfig
 	http   *http.Client
 }
 
-func NewMotorClient(c domain.MotorConfig) *MotorClient {
+func NewMotorClient(c *domain.MotorConfig) *MotorClient {
 	return &MotorClient{
 		config: c,
 		http:   &http.Client{},
 	}
 }
 
-func (c *MotorClient) GetConfig() domain.MotorConfig {
-	return c.config
+func (c *MotorClient) GetConfig(ctx context.Context) (*domain.MotorConfig, error) {
+	url := fmt.Sprintf("http://%s/config", c.config.CurrentIP)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("[MOTOR-%d] %s  cannot be reached", c.config.MotorID, url)
+	}
+	defer resp.Body.Close()
+
+	var res domain.MotorConfig
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return nil, fmt.Errorf("[MOTOR-%d] %s  returns invalid data format", c.config.MotorID, url)
+	}
+	res.CurrentIP = c.config.CurrentIP
+
+	c.config = &res
+
+	return &res, nil
 }
 
 func (c *MotorClient) GetStatus(ctx context.Context) (*domain.MotorStatus, error) {
 	url := fmt.Sprintf("http://%s/status", c.config.CurrentIP)
 
-	resp, err := c.http.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("[MOTOR-%d] %s  cannot be reached", c.config.MotorID, url)
 	}
@@ -48,7 +74,7 @@ func (c *MotorClient) GetStatus(ctx context.Context) (*domain.MotorStatus, error
 }
 
 func (c *MotorClient) Move(ctx context.Context, steps int, speed float64) error {
-	url := fmt.Sprintf("http://%s/move?steps=%d&speed=%.2f", c.config.CurrentIP, steps, speed)
+	url := fmt.Sprintf("http://%s/move?steps=%d&speed=%f", c.config.CurrentIP, steps, speed)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {

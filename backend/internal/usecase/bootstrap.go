@@ -23,16 +23,19 @@ func BootstrapMotors(ctx context.Context, scanner domain.MotorDiscover) ([]domai
 
 	var motors []domain.IMotor
 	for _, cfg := range configs {
-		motors = append(motors, esp32.NewMotorClient(cfg))
+		motors = append(motors, esp32.NewMotorClient(&cfg))
 	}
 
 	slices.SortFunc(motors, func(a, b domain.IMotor) int {
-		return a.GetConfig().MotorID - b.GetConfig().MotorID
+		aC, _ := a.GetConfig(ctx)
+		bC, _ := b.GetConfig(ctx)
+		return aC.MotorID - bC.MotorID
 	})
 
 	for i, m := range motors {
-		if m.GetConfig().MotorID != (i + 1) {
-			return nil, fmt.Errorf("[BOOTSTRAP] sequence error: expected motor ID %d at index %d, but got ID %d", i, i, m.GetConfig().MotorID)
+		mC, _ := m.GetConfig(ctx)
+		if mC.MotorID != (i + 1) {
+			return nil, fmt.Errorf("[BOOTSTRAP] sequence error: expected motor ID %d at index %d, but got ID %d", i, i, mC.MotorID)
 		}
 	}
 

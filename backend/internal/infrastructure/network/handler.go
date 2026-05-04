@@ -25,6 +25,7 @@ func (h *MotorHandler) MapRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/status", h.handleStatus)
 	mux.HandleFunc("POST /api/calibrate", h.handleCalibrate)
 	mux.HandleFunc("POST /api/stop", h.handleEmergencyStop)
+	mux.HandleFunc("POST /api/home", h.handleGoHome)
 
 }
 
@@ -39,6 +40,12 @@ func (h *MotorHandler) handleMove(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 		return
 	}
+
+	if req.Speed <= 0 {
+		http.Error(w, "Speed must be a positive value", http.StatusBadRequest)
+		return
+	}
+
 	if err := h.orchestrator.MoveToPoint(r.Context(), req.X, req.Y, req.Speed); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -152,7 +159,6 @@ func (h *MotorHandler) handleConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *MotorHandler) handleGoHome(w http.ResponseWriter, r *http.Request) {
-	// 1. Decode speed from the request
 	var req struct {
 		Speed float64 `json:"speed"`
 	}
@@ -162,7 +168,6 @@ func (h *MotorHandler) handleGoHome(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Validate
 	if req.Speed <= 0 {
 		http.Error(w, "Speed must be positive", http.StatusBadRequest)
 		return
