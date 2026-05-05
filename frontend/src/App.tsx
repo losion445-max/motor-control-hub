@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { hubApi } from './infrastructure/api';
 import type { SystemStatus, HubConfig } from './domain/types';
 
-// --- UPDATED SIDEBAR COMPONENT ---
+
+  
 const Sidebar = ({ activeTab, onTabChange }: { activeTab: string, onTabChange: (tab: string) => void }) => (
   <aside className="w-64 bg-slate-900 p-6 rounded-2xl border border-slate-800 flex flex-col gap-6">
     <div className="flex items-center gap-2 font-bold text-lg text-white">
@@ -50,13 +51,9 @@ export default function Dashboard() {
   const [speed, setSpeed] = useState(15.0);
   const [isLive, setIsLive] = useState(false);
 
-  // New states for the config form
   const [newWidth, setNewWidth] = useState('');
   const [newHeight, setNewHeight] = useState('');
 
-  useEffect(() => {
-    refreshConfig();
-  }, []);
 
   const refreshConfig = () => {
     hubApi.getConfig().then(data => {
@@ -67,13 +64,16 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    refreshConfig();
+  }, []);
+
+
+  useEffect(() => {
     const timer = setInterval(() => {
-      hubApi.getStatus()
-        .then(data => {
+      hubApi.getStatus().then(data => {
           setStatus(data);
           setIsLive(true);
-        })
-        .catch(() => setIsLive(false));
+      }).catch(() => setIsLive(false));
     }, 200);
     return () => clearInterval(timer);
   }, []);
@@ -82,22 +82,10 @@ export default function Dashboard() {
     e.preventDefault();
     try {
         await hubApi.updateDimensions(parseFloat(newWidth), parseFloat(newHeight));
-        alert("Dimensions updated successfully!");
-        refreshConfig(); // Get latest from server
-        setActiveTab('dashboard'); // Return to main view
-    } catch (err) {
-        alert("Failed to update dimensions");
-    }
-  };
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!config) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const pctX = (e.clientX - rect.left) / rect.width;
-    const pctY = (e.clientY - rect.top) / rect.height;
-    const targetX = parseFloat((pctX * config.frame_width).toFixed(2));
-    const targetY = parseFloat((pctY * config.frame_height).toFixed(2));
-    hubApi.moveTo(targetX, targetY, speed);
+        refreshConfig();
+        setActiveTab('dashboard');
+        alert("Configuration updated! Remember to re-calibrate.");
+    } catch (err) { alert("Update failed"); }
   };
 
   const getPositionStyles = () => {
@@ -116,113 +104,92 @@ export default function Dashboard() {
         <header className="flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-bold text-white tracking-tight">
-              {activeTab === 'dashboard' ? 'System Control' : 'Frame Configuration'}
+              {activeTab === 'dashboard' ? 'System Control' : 'System Configuration'}
             </h2>
-            <p className="text-sm text-slate-500">Dimensions: {config?.frame_width}mm x {config?.frame_height}mm</p>
+            <p className="text-sm text-slate-500">{config?.frame_width}mm x {config?.frame_height}mm</p>
           </div>
-          <div className={`px-4 py-1.5 rounded-full border text-xs font-bold flex items-center gap-2 transition-all ${
+          <div className={`px-4 py-1.5 rounded-full border text-xs font-bold flex items-center gap-2 ${
             isLive ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-500' : 'bg-red-500/10 border-red-500/50 text-red-500'
           }`}>
             <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></span>
-            {isLive ? 'HUB ONLINE' : 'HUB OFFLINE'}
+            {isLive ? 'ONLINE' : 'OFFLINE'}
           </div>
         </header>
 
         {activeTab === 'dashboard' ? (
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-7 space-y-4">
-              <div 
-                className="aspect-square bg-slate-900/50 rounded-3xl border border-slate-800 relative cursor-crosshair overflow-hidden group shadow-2xl"
-                onClick={handleCanvasClick}
-              >
-                <div className="absolute inset-0 opacity-20" style={{ 
-                  backgroundImage: 'linear-gradient(#4F46E5 1px, transparent 1px), linear-gradient(90deg, #4F46E5 1px, transparent 1px)', 
-                  backgroundSize: '10% 10%' 
-                }}></div>
-                
+              <div className="aspect-square bg-slate-900/50 rounded-3xl border border-slate-800 relative cursor-crosshair overflow-hidden group shadow-2xl"
+                onClick={(e) => {
+                  if (!config) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  hubApi.moveTo(
+                    parseFloat((((e.clientX - rect.left) / rect.width) * config.frame_width).toFixed(2)),
+                    parseFloat((((e.clientY - rect.top) / rect.height) * config.frame_height).toFixed(2)),
+                    speed
+                  );
+                }}>
+                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(#4F46E5 1px, transparent 1px), linear-gradient(90deg, #4F46E5 1px, transparent 1px)', backgroundSize: '10% 10%' }}></div>
                 <div className="absolute w-6 h-6 -ml-3 -mt-3 transition-all duration-300 ease-out" style={getPositionStyles()}>
                   <div className="absolute top-1/2 left-0 w-full h-0.5 bg-indigo-500"></div>
                   <div className="absolute left-1/2 top-0 w-0.5 h-full bg-indigo-500"></div>
-                  <div className="absolute inset-0 rounded-full border-2 border-indigo-500 animate-ping opacity-25"></div>
                 </div>
               </div>
-              
-              <div className="bg-slate-900/80 backdrop-blur-md p-6 rounded-2xl border border-slate-800">
-                <div className="flex justify-between mb-4">
-                  <label className="text-sm font-semibold text-slate-400">Movement Speed</label>
-                  <span className="font-mono text-indigo-400 font-bold">{speed} units/s</span>
-                </div>
-                <input title="input" type="range" min="1" max="50" step="0.5" value={speed} 
-                  onChange={(e) => setSpeed(parseFloat(e.target.value))} 
-                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                />
+              <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800">
+                <input type="range" min="1" max="50" step="0.5" value={speed} onChange={(e) => setSpeed(parseFloat(e.target.value))} className="w-full accent-indigo-500" />
               </div>
             </div>
             
             <div className="col-span-5 space-y-6">
-              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-xl relative overflow-hidden">
-                <div className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-2">Live Telemetry</div>
-                <div className="font-mono text-5xl text-white font-bold tracking-tighter flex gap-4">
-                  <span className="opacity-50 text-2xl mt-auto pb-1">X</span> {status?.position.x.toFixed(2) || '0.00'}
-                  <span className="opacity-50 text-2xl mt-auto pb-1 ml-4">Y</span> {status?.position.y.toFixed(2) || '0.00'}
+              <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl">
+                <div className="text-5xl text-white font-bold font-mono">
+                  X {status?.position.x.toFixed(1)} Y {status?.position.y.toFixed(1)}
                 </div>
               </div>
-
               <div className="grid grid-cols-3 gap-3">
-                <button onClick={() => hubApi.stop()} className="group py-4 bg-red-500/10 hover:bg-red-500 border border-red-500/20 hover:border-red-500 text-red-500 hover:text-white font-black rounded-2xl transition-all duration-200 uppercase text-xs tracking-widest">Stop</button>
-                <button onClick={() => hubApi.home(speed)} className="py-4 bg-slate-800 hover:bg-indigo-600 text-white font-bold rounded-2xl transition-all duration-200 uppercase text-xs tracking-widest">Home</button>
-                <button onClick={() => hubApi.calibrate(speed)} className="py-4 bg-slate-800 hover:bg-amber-600 text-white font-bold rounded-2xl transition-all duration-200 uppercase text-xs tracking-widest">Calibrate</button>
+                <button onClick={() => hubApi.stop()} className="py-4 bg-red-500/10 text-red-500 rounded-2xl font-bold">STOP</button>
+                <button onClick={() => hubApi.home(speed)} className="py-4 bg-slate-800 text-white rounded-2xl font-bold">HOME</button>
+                <button onClick={() => hubApi.calibrate(speed)} className="py-4 bg-slate-800 text-white rounded-2xl font-bold">CALIBRATE</button>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
-                {status?.motors.map(m => <MotorCard key={m.motor_id} motor={m} />) || 
-                 [0,1,2,3].map(i => <div key={i} className="h-24 bg-slate-900/50 animate-pulse rounded-xl border border-slate-800"></div>)
-                }
+                {status?.motors.map(m => <MotorCard key={m.motor_id} motor={m} />)}
               </div>
             </div>
           </div>
         ) : (
-          // --- CONFIGURATION TAB VIEW ---
-          <div className="max-w-2xl bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-xl">
-            <h3 className="text-lg font-bold text-white mb-6">Physical Frame Settings</h3>
-            <form onSubmit={handleUpdateDimensions} className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-400 font-medium">Frame Width (mm)</label>
-                  <input 
-                    type="number" 
-                    value={newWidth}
-                    onChange={(e) => setNewWidth(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 text-white transition-all"
-                    placeholder="e.g. 1000"
-                  />
+          <div className="space-y-6 max-w-4xl">
+            {/* Frame Settings Form */}
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-xl">
+              <h3 className="text-lg font-bold text-white mb-6">Physical Frame Settings</h3>
+              <form onSubmit={handleUpdateDimensions} className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <label className="text-sm text-slate-400 block mb-2">Width (mm)</label>
+                    <input type="number" value={newWidth} onChange={(e) => setNewWidth(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+                  </div>
+                  <div>
+                    <label className="text-sm text-slate-400 block mb-2">Height (mm)</label>
+                    <input type="number" value={newHeight} onChange={(e) => setNewHeight(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm text-slate-400 font-medium">Frame Height (mm)</label>
-                  <input 
-                    type="number" 
-                    value={newHeight}
-                    onChange={(e) => setNewHeight(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:border-indigo-500 text-white transition-all"
-                    placeholder="e.g. 1000"
-                  />
-                </div>
-              </div>
-              
-              <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                <p className="text-xs text-amber-500 font-medium leading-relaxed">
-                  ⚠️ Note: Changing frame dimensions will immediately invalidate current calibration. 
-                  You must re-calibrate the system after saving these changes.
-                </p>
-              </div>
+                <button type="submit" className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl">Apply Changes</button>
+              </form>
+            </div>
 
-              <button 
-                type="submit"
-                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)]"
-              >
-                Apply New Dimensions
-              </button>
-            </form>
+            {/* Motor Inventory Info */}
+            <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl shadow-xl">
+              <h3 className="text-lg font-bold text-white mb-6">Active Motor Hardware</h3>
+              <div className="space-y-4">
+                {config?.motors.map((m) => (
+                  <div key={m.motor_id} className="grid grid-cols-4 gap-4 p-4 bg-slate-950 border border-slate-800 rounded-2xl">
+                    <div><div className="text-[10px] text-slate-500">ID</div><div className="text-white font-bold">#{m.motor_id}</div></div>
+                    <div><div className="text-[10px] text-slate-500">IP ADDRESS</div><div className="text-indigo-400 text-sm font-mono">{m.ip_address}</div></div>
+                    <div><div className="text-[10px] text-slate-500">RESOLUTION</div><div className="text-slate-300 text-sm">{m.steps_per_rev} steps</div></div>
+                    <div><div className="text-[10px] text-slate-500">PULLEY</div><div className="text-slate-300 text-sm">{m.pulley_mm} mm</div></div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </main>
