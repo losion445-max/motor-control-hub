@@ -20,5 +20,8 @@ export const hubApi = {
     api.post('/stop'),
 
   calibrate: (speed: number) => 
-    api.post('/calibrate', { speed })
+    api.post('/calibrate', { speed }),
+
+  updateDimensions: (width: number, height: number) => 
+    api.post('/dimensions', { width, height }).then(res => res.data)
 };
