@@ -21,6 +21,10 @@ func (m *MotorOrchestrator) GetFrameWidth() float64 {
 	return m.kinematics.Width
 }
 
+func (orc *MotorOrchestrator) SetDimensions(width, height float64) {
+	orc.kinematics.UpdateDimensions(width, height)
+}
+
 func NewMotorOrchestrator(motors []domain.IMotor, kinematics *KinematicsService) *MotorOrchestrator {
 	if len(motors) != 4 {
 		log.Panicf("Connected motors must be 4!")

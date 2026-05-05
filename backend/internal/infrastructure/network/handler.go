@@ -26,6 +26,7 @@ func (h *MotorHandler) MapRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/calibrate", h.handleCalibrate)
 	mux.HandleFunc("POST /api/stop", h.handleEmergencyStop)
 	mux.HandleFunc("POST /api/home", h.handleGoHome)
+	mux.HandleFunc("POST /api/dimensions", h.handleUpdateDimensions)
 
 }
 
@@ -182,5 +183,33 @@ func (h *MotorHandler) handleGoHome(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"status":  "success",
 		"message": "Moving to home position (0,0)",
+	})
+}
+
+func (h *MotorHandler) handleUpdateDimensions(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Width  float64 `json:"width"`
+		Height float64 `json:"height"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Width <= 0 || req.Height <= 0 {
+		http.Error(w, "Width and Height must be positive values", http.StatusBadRequest)
+		return
+	}
+
+	h.orchestrator.SetDimensions(req.Width, req.Height)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"new_dimensions": map[string]float64{
+			"width":  req.Width,
+			"height": req.Height,
+		},
 	})
 }

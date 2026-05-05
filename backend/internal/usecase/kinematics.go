@@ -139,3 +139,10 @@ func (s *KinematicsService) calculateIK(pos domain.Point) [MotorCount]float64 {
 		math.Sqrt(x*x + math.Pow(s.Height-y, 2)),                    // Bottom-Left
 	}
 }
+
+func (s *KinematicsService) UpdateDimensions(width, height float64) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Width = width
+	s.Height = height
+}
