@@ -27,7 +27,7 @@ func main() {
 
 	for _, m := range motors {
 		status, _ := m.GetStatus(ctx)
-		log.Printf("[MAIN] Motor %d is at position %d", status.MotorID, status.CurrentSteps)
+		log.Printf("[MAIN] Motor %d is enabled %v", status.MotorID, status.Enabled)
 	}
 
 	kinematics, err := usecase.NewKinematicsService(10, 10, motors)

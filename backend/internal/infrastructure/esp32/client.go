@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/losion445-max/motor-control-hub/internal/domain"
 )
@@ -22,7 +23,7 @@ type MotorClient struct {
 func NewMotorClient(c *domain.MotorConfig) *MotorClient {
 	return &MotorClient{
 		config: c,
-		http:   &http.Client{},
+		http:   &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -36,13 +37,13 @@ func (c *MotorClient) GetConfig(ctx context.Context) (*domain.MotorConfig, error
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("[MOTOR-%d] %s  cannot be reached", c.config.MotorID, url)
+		return nil, fmt.Errorf("[MOTOR-%d] %s  cannot be reached\n%w", c.config.MotorID, url, err)
 	}
 	defer resp.Body.Close()
 
 	var res domain.MotorConfig
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return nil, fmt.Errorf("[MOTOR-%d] %s  returns invalid data format", c.config.MotorID, url)
+		return nil, fmt.Errorf("[MOTOR-%d] %s  returns invalid data format\n%w", c.config.MotorID, url, err)
 	}
 	res.CurrentIP = c.config.CurrentIP
 
@@ -61,13 +62,13 @@ func (c *MotorClient) GetStatus(ctx context.Context) (*domain.MotorStatus, error
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("[MOTOR-%d] %s  cannot be reached", c.config.MotorID, url)
+		return nil, fmt.Errorf("[MOTOR-%d] %s  cannot be reached\n%w", c.config.MotorID, url, err)
 	}
 	defer resp.Body.Close()
 
 	var res response
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return nil, fmt.Errorf("[MOTOR-%d] %s returns invalid data format", c.config.MotorID, url)
+		return nil, fmt.Errorf("[MOTOR-%d] %s returns invalid data format\n%w", c.config.MotorID, url, err)
 	}
 
 	return &res.Data, nil
@@ -76,14 +77,14 @@ func (c *MotorClient) GetStatus(ctx context.Context) (*domain.MotorStatus, error
 func (c *MotorClient) Move(ctx context.Context, steps int, speed float64) error {
 	url := fmt.Sprintf("http://%s/move?steps=%d&speed=%f", c.config.CurrentIP, steps, speed)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
-		return fmt.Errorf("[MOTOR-%d] %s cannot form request", c.config.MotorID, url)
+		return fmt.Errorf("[MOTOR-%d] %s cannot form request\n%w", c.config.MotorID, url, err)
 	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("[MOTOR-%d] %s  cannot be reached", c.config.MotorID, url)
+		return fmt.Errorf("[MOTOR-%d] %s  cannot be reached\n%w", c.config.MotorID, url, err)
 	}
 	defer resp.Body.Close()
 
@@ -92,14 +93,14 @@ func (c *MotorClient) Move(ctx context.Context, steps int, speed float64) error 
 
 func (c *MotorClient) Stop(ctx context.Context) error {
 	url := fmt.Sprintf("http://%s/stop", c.config.CurrentIP)
-	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
 	if err != nil {
-		return fmt.Errorf("[MOTOR-%d] %s cannot form request", c.config.MotorID, url)
+		return fmt.Errorf("[MOTOR-%d] %s cannot form request\n%w", c.config.MotorID, url, err)
 	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("[MOTOR-%d] %s  cannot be reached", c.config.MotorID, url)
+		return fmt.Errorf("[MOTOR-%d] %s  cannot be reached\n%w", c.config.MotorID, url, err)
 	}
 	defer resp.Body.Close()
 
