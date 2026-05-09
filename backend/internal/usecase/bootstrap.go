@@ -9,7 +9,7 @@ import (
 	"github.com/losion445-max/motor-control-hub/internal/domain"
 )
 
-const ExpectedMotors = 4
+const MotorCount = 4
 
 type MotorFactory func(cfg *domain.MotorConfig) domain.IMotor
 
@@ -21,15 +21,15 @@ func BootstrapMotors(ctx context.Context, scanner domain.MotorDiscover, factory 
 		return nil, fmt.Errorf("discovery failed: %w", err)
 	}
 
-	if len(configs) != ExpectedMotors {
-		return nil, fmt.Errorf("critical error: expected %d motors, found %d", ExpectedMotors, len(configs))
+	if len(configs) != MotorCount {
+		return nil, fmt.Errorf("critical error: expected %d motors, found %d", MotorCount, len(configs))
 	}
 
 	sort.Slice(configs, func(i, j int) bool {
 		return configs[i].MotorID < configs[j].MotorID
 	})
 
-	motors := make([]domain.IMotor, 0, ExpectedMotors)
+	motors := make([]domain.IMotor, 0, MotorCount)
 	for i, cfg := range configs {
 		expectedID := i + 1
 		if cfg.MotorID != expectedID {

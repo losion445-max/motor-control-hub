@@ -9,8 +9,6 @@ import (
 	"github.com/losion445-max/motor-control-hub/internal/domain"
 )
 
-const MotorCount = 4
-
 type KinematicsService struct {
 	Width, Height float64
 	Motors        []domain.IMotor
@@ -132,11 +130,18 @@ func (s *KinematicsService) mmToSteps(ctx context.Context, lengthMM float64, mot
 
 func (s *KinematicsService) calculateIK(pos domain.Point) [MotorCount]float64 {
 	x, y := pos.X, pos.Y
+	w, h := s.Width, s.Height
+
+	distTL := math.Sqrt(x*x + y*y)
+	distTR := math.Sqrt(math.Pow(w-x, 2) + y*y)
+	distBR := math.Sqrt(math.Pow(w-x, 2) + math.Pow(h-y, 2))
+	distBL := math.Sqrt(x*x + math.Pow(h-y, 2))
+
 	return [MotorCount]float64{
-		math.Sqrt(x*x + y*y),                                        // Top-Left
-		math.Sqrt(math.Pow(s.Width-x, 2) + y*y),                     // Top-Right
-		math.Sqrt(math.Pow(s.Width-x, 2) + math.Pow(s.Height-y, 2)), // Bottom-Right
-		math.Sqrt(x*x + math.Pow(s.Height-y, 2)),                    // Bottom-Left
+		distBL,
+		distTL,
+		distTR,
+		distBR,
 	}
 }
 
