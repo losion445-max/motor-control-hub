@@ -20,10 +20,10 @@ type ARPScanner struct {
 	client        *http.Client
 }
 
-func NewARPScanner(iface string) *ARPScanner {
+func NewARPScanner(iface string, timeout time.Duration) *ARPScanner {
 	return &ARPScanner{
 		interfaceName: iface,
-		client:        &http.Client{Timeout: 300 * time.Millisecond},
+		client:        &http.Client{Timeout: timeout},
 	}
 }
 
@@ -43,7 +43,7 @@ func (s *ARPScanner) Discover(ctx context.Context) ([]domain.MotorConfig, error)
 		wg.Add(1)
 		go func(targetIP string) {
 			defer wg.Done()
-			cfg, err := s.fetchConfig(targetIP)
+			cfg, err := s.fetchConfig(ctx, targetIP)
 			if err == nil {
 				mu.Lock()
 				cfg.CurrentIP = targetIP
@@ -78,12 +78,22 @@ func (s *ARPScanner) getIpsFromArpTable() ([]string, error) {
 	return ips, nil
 }
 
-func (s *ARPScanner) fetchConfig(ip string) (*domain.MotorConfig, error) {
-	resp, err := s.client.Get(fmt.Sprintf("http://%s/config", ip))
+func (s *ARPScanner) fetchConfig(ctx context.Context, ip string) (*domain.MotorConfig, error) {
+	url := fmt.Sprintf("http://%s/config", ip)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 
 	var apiResp struct {
 		Status string             `json:"status"`
@@ -95,7 +105,7 @@ func (s *ARPScanner) fetchConfig(ip string) (*domain.MotorConfig, error) {
 	}
 
 	if apiResp.Status != "ok" {
-		return nil, fmt.Errorf("status not ok")
+		return nil, fmt.Errorf("status not ok: %s", apiResp.Status)
 	}
 
 	return &apiResp.Data, nil

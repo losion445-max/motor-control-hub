@@ -16,7 +16,7 @@ func main() {
 
 	log.Println("[MAIN] Starting Motor Control Hub...")
 
-	scanner := network.NewARPScanner("wlan1")
+	scanner := network.NewARPScanner("wlan1", 300*time.Millisecond)
 
 	motors, err := usecase.BootstrapMotors(ctx, scanner)
 	if err != nil {
