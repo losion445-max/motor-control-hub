@@ -4,41 +4,41 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"slices"
+	"sort"
 
 	"github.com/losion445-max/motor-control-hub/internal/domain"
-	"github.com/losion445-max/motor-control-hub/internal/infrastructure/esp32"
 )
 
-func BootstrapMotors(ctx context.Context, scanner domain.MotorDiscover) ([]domain.IMotor, error) {
+const ExpectedMotors = 4
+
+type MotorFactory func(cfg *domain.MotorConfig) domain.IMotor
+
+func BootstrapMotors(ctx context.Context, scanner domain.MotorDiscover, factory MotorFactory) ([]domain.IMotor, error) {
 	log.Println("[BOOTSTRAP] Looking for motors...")
+
 	configs, err := scanner.Discover(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("discovery failed: %w", err)
 	}
 
-	if len(configs) != 4 {
-		return nil, fmt.Errorf("[BOOTSTRAP] critical error: expected 4 motors, found %d", len(configs))
+	if len(configs) != ExpectedMotors {
+		return nil, fmt.Errorf("critical error: expected %d motors, found %d", ExpectedMotors, len(configs))
 	}
 
-	var motors []domain.IMotor
-	for _, cfg := range configs {
-		motors = append(motors, esp32.NewMotorClient(&cfg))
-	}
-
-	slices.SortFunc(motors, func(a, b domain.IMotor) int {
-		aC, _ := a.GetConfig(ctx)
-		bC, _ := b.GetConfig(ctx)
-		return aC.MotorID - bC.MotorID
+	sort.Slice(configs, func(i, j int) bool {
+		return configs[i].MotorID < configs[j].MotorID
 	})
 
-	for i, m := range motors {
-		mC, _ := m.GetConfig(ctx)
-		if mC.MotorID != (i + 1) {
-			return nil, fmt.Errorf("[BOOTSTRAP] sequence error: expected motor ID %d at index %d, but got ID %d", i, i, mC.MotorID)
+	motors := make([]domain.IMotor, 0, ExpectedMotors)
+	for i, cfg := range configs {
+		expectedID := i + 1
+		if cfg.MotorID != expectedID {
+			return nil, fmt.Errorf("sequence error: expected ID %d, but got %d at position %d", expectedID, cfg.MotorID, i)
 		}
+
+		motors = append(motors, factory(&cfg))
 	}
 
-	log.Println("[BOOTStRAP] Motors were successfully initialized and mapped to corners!")
+	log.Printf("[BOOTSTRAP] Successfully initialized %d motors", len(motors))
 	return motors, nil
 }

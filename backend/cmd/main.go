@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/losion445-max/motor-control-hub/internal/infrastructure/esp32"
 	"github.com/losion445-max/motor-control-hub/internal/infrastructure/network"
+
 	"github.com/losion445-max/motor-control-hub/internal/usecase"
 )
 
@@ -18,7 +20,7 @@ func main() {
 
 	scanner := network.NewARPScanner("wlan1", 300*time.Millisecond)
 
-	motors, err := usecase.BootstrapMotors(ctx, scanner)
+	motors, err := usecase.BootstrapMotors(ctx, scanner, esp32.NewMotorClientFactory())
 	if err != nil {
 		log.Fatalf("[MAIN] Failed to initialize system: %v", err)
 	}
