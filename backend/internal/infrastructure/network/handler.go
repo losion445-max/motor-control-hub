@@ -18,13 +18,13 @@ func NewMotorHandler(orc *usecase.MotorOrchestrator) *MotorHandler {
 }
 
 func (h *MotorHandler) MapRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/config", h.handleConfig)
+	mux.HandleFunc("GET /api/config", h.handleGetConfig)
+	mux.HandleFunc("POST /api/config", h.handleUpdateConfig)
 	mux.HandleFunc("GET /api/status", h.handleStatus)
 	mux.HandleFunc("POST /api/move", h.handleMove)
 	mux.HandleFunc("POST /api/calibrate", h.handleCalibrate)
 	mux.HandleFunc("POST /api/stop", h.handleEmergencyStop)
 	mux.HandleFunc("POST /api/home", h.handleGoHome)
-	mux.HandleFunc("POST /api/dimensions", h.handleUpdateDimensions)
 }
 
 func (h *MotorHandler) handleMove(w http.ResponseWriter, r *http.Request) {
@@ -115,22 +115,53 @@ func (h *MotorHandler) handleEmergencyStop(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-func (h *MotorHandler) handleConfig(w http.ResponseWriter, r *http.Request) {
-	motorConfigs, err := h.orchestrator.GetAllAggregatedConfig(r.Context())
-	if err != nil {
-		log.Printf("[HTTP] Config error: %v", err)
-		respondError(w, http.StatusInternalServerError, "Failed to fetch hardware config")
+func (h *MotorHandler) handleGetConfig(w http.ResponseWriter, r *http.Request) {
+	cfg := h.orchestrator.GetConfig()
+	motorConfigs, _ := h.orchestrator.GetAllAggregatedConfig(r.Context())
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"global":          cfg,
+		"motors_hardware": motorConfigs,
+	})
+}
+
+func (h *MotorHandler) handleUpdateConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Width        *float64 `json:"width"`
+		Height       *float64 `json:"height"`
+		Diameter     *float64 `json:"diameter"`
+		StepsPerRev  *int     `json:"steps_per_rev"`
+		MotorMapping *[4]int  `json:"motor_mapping"`
+	}
+
+	if err := decode(r, &req); err != nil {
+		respondError(w, http.StatusBadRequest, "Invalid config JSON")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, struct {
-		FrameWidth  float64              `json:"frame_width"`
-		FrameHeight float64              `json:"frame_height"`
-		Motors      []domain.MotorConfig `json:"motors"`
-	}{
-		FrameWidth:  h.orchestrator.GetFrameWidth(),
-		FrameHeight: h.orchestrator.GetFrameHeight(),
-		Motors:      motorConfigs,
+	cfg := h.orchestrator.GetConfig()
+
+	if req.Width != nil {
+		cfg.Kinematics.Width = *req.Width
+	}
+	if req.Height != nil {
+		cfg.Kinematics.Height = *req.Height
+	}
+	if req.Diameter != nil {
+		cfg.Kinematics.Diameter = *req.Diameter
+	}
+	if req.StepsPerRev != nil {
+		cfg.Kinematics.StepsPerRev = *req.StepsPerRev
+	}
+	if req.MotorMapping != nil {
+		cfg.MotorMapping = *req.MotorMapping
+	}
+
+	h.orchestrator.Sync()
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":         "success",
+		"applied_config": cfg,
 	})
 }
 
@@ -156,30 +187,4 @@ func (h *MotorHandler) handleGoHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "moving_home"})
-}
-
-func (h *MotorHandler) handleUpdateDimensions(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Width  float64 `json:"width"`
-		Height float64 `json:"height"`
-	}
-
-	if err := decode(r, &req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid JSON body")
-		return
-	}
-
-	if req.Width <= 0 || req.Height <= 0 {
-		respondError(w, http.StatusBadRequest, "Width and Height must be positive")
-		return
-	}
-
-	h.orchestrator.SetDimensions(req.Width, req.Height)
-	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"status": "success",
-		"dimensions": map[string]float64{
-			"width":  req.Width,
-			"height": req.Height,
-		},
-	})
 }

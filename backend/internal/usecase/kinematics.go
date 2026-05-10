@@ -6,34 +6,44 @@ import (
 	"math"
 	"sync"
 
+	"github.com/losion445-max/motor-control-hub/internal/config"
 	"github.com/losion445-max/motor-control-hub/internal/domain"
 )
 
 type KinematicsService struct {
-	Width, Height float64
-	Motors        []domain.IMotor
+	cfg    *config.GlobalConfig
+	Motors []domain.IMotor
 
-	mu                   sync.Mutex
+	stepsPerMM float64
+
+	mu                   sync.RWMutex
 	currentPosition      domain.Point
 	currentAbsoluteSteps [MotorCount]int
 }
 
-func NewKinematicsService(width, height float64, motorInstances []domain.IMotor) (*KinematicsService, error) {
+func NewKinematicsService(cfg *config.GlobalConfig, motorInstances []domain.IMotor) (*KinematicsService, error) {
 	if len(motorInstances) != MotorCount {
 		return nil, fmt.Errorf("kinematics service requires exactly %d motors, got %d", MotorCount, len(motorInstances))
 	}
 
-	return &KinematicsService{
-		Width:  width,
-		Height: height,
+	s := &KinematicsService{
+		cfg:    cfg,
 		Motors: motorInstances,
-	}, nil
+	}
+
+	s.SyncConfig()
+
+	return s, nil
+}
+
+func (s *KinematicsService) SyncConfig() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stepsPerMM = float64(s.cfg.Kinematics.StepsPerRev) / (s.cfg.Kinematics.Diameter * math.Pi)
 }
 
 func (s *KinematicsService) MoveTo(ctx context.Context, targetPos domain.Point, baseSpeed float64) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	s.mu.RLock()
 	target := s.clampPoint(targetPos)
 	targetLengths := s.calculateIK(target)
 
@@ -42,10 +52,7 @@ func (s *KinematicsService) MoveTo(ctx context.Context, targetPos domain.Point, 
 	var maxDelta float64
 
 	for i := 0; i < MotorCount; i++ {
-		steps, err := s.mmToSteps(ctx, targetLengths[i], i)
-		if err != nil {
-			return fmt.Errorf("failed to calculate steps for motor %d: %w", i, err)
-		}
+		steps := int(math.Round(targetLengths[i] * s.stepsPerMM))
 		targetSteps[i] = steps
 		deltas[i] = steps - s.currentAbsoluteSteps[i]
 
@@ -54,6 +61,7 @@ func (s *KinematicsService) MoveTo(ctx context.Context, targetPos domain.Point, 
 			maxDelta = absDelta
 		}
 	}
+	s.mu.RUnlock()
 
 	var wg sync.WaitGroup
 	errChan := make(chan error, MotorCount)
@@ -81,18 +89,20 @@ func (s *KinematicsService) MoveTo(ctx context.Context, targetPos domain.Point, 
 		return <-errChan
 	}
 
+	s.mu.Lock()
 	s.currentAbsoluteSteps = [MotorCount]int(targetSteps)
 	s.currentPosition = target
+	s.mu.Unlock()
+
 	return nil
 }
 
-func (s *KinematicsService) Calibrate(ctx context.Context, calibrationSpeed float64) error {
+func (s *KinematicsService) Calibrate(ctx context.Context, speed float64) error {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.currentAbsoluteSteps = [MotorCount]int{}
 	s.currentPosition = domain.Point{X: 0, Y: 0}
-	s.mu.Unlock()
-
-	return s.MoveTo(ctx, domain.Point{X: 0, Y: 0}, calibrationSpeed)
+	return nil
 }
 
 func (s *KinematicsService) StopAll(ctx context.Context) error {
@@ -109,45 +119,35 @@ func (s *KinematicsService) StopAll(ctx context.Context) error {
 	}
 	wg.Wait()
 	close(errChan)
-	return <-errChan
+
+	if len(errChan) > 0 {
+		return <-errChan
+	}
+	return nil
 }
 
 func (s *KinematicsService) clampPoint(p domain.Point) domain.Point {
 	return domain.Point{
-		X: math.Max(0, math.Min(p.X, s.Width)),
-		Y: math.Max(0, math.Min(p.Y, s.Height)),
+		X: math.Max(0, math.Min(p.X, s.cfg.Kinematics.Width)),
+		Y: math.Max(0, math.Min(p.Y, s.cfg.Kinematics.Height)),
 	}
-}
-
-func (s *KinematicsService) mmToSteps(ctx context.Context, lengthMM float64, motorIdx int) (int, error) {
-	config, err := s.Motors[motorIdx].GetConfig(ctx)
-	if err != nil {
-		return 0, err
-	}
-	steps := (lengthMM * float64(config.StepsPerRev)) / (config.PulleyMM * math.Pi)
-	return int(math.Round(steps)), nil
 }
 
 func (s *KinematicsService) calculateIK(pos domain.Point) [MotorCount]float64 {
 	x, y := pos.X, pos.Y
-	w, h := s.Width, s.Height
+	w, h := s.cfg.Kinematics.Width, s.cfg.Kinematics.Height
 
 	distTL := math.Sqrt(x*x + y*y)
 	distTR := math.Sqrt(math.Pow(w-x, 2) + y*y)
 	distBR := math.Sqrt(math.Pow(w-x, 2) + math.Pow(h-y, 2))
 	distBL := math.Sqrt(x*x + math.Pow(h-y, 2))
 
-	return [MotorCount]float64{
-		distBL,
-		distTL,
-		distTR,
-		distBR,
-	}
-}
+	var lengths [MotorCount]float64
 
-func (s *KinematicsService) UpdateDimensions(width, height float64) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.Width = width
-	s.Height = height
+	lengths[s.cfg.MotorMapping[0]-1] = distTL
+	lengths[s.cfg.MotorMapping[1]-1] = distTR
+	lengths[s.cfg.MotorMapping[2]-1] = distBR
+	lengths[s.cfg.MotorMapping[3]-1] = distBL
+
+	return lengths
 }

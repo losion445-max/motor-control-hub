@@ -5,6 +5,7 @@ import (
 	"log"
 	"sync"
 
+	"github.com/losion445-max/motor-control-hub/internal/config"
 	"github.com/losion445-max/motor-control-hub/internal/domain"
 )
 
@@ -13,21 +14,9 @@ type MotorOrchestrator struct {
 	kinematics *KinematicsService
 }
 
-func (m *MotorOrchestrator) GetFrameHeight() float64 {
-	return m.kinematics.Height
-}
-
-func (m *MotorOrchestrator) GetFrameWidth() float64 {
-	return m.kinematics.Width
-}
-
-func (orc *MotorOrchestrator) SetDimensions(width, height float64) {
-	orc.kinematics.UpdateDimensions(width, height)
-}
-
 func NewMotorOrchestrator(motors []domain.IMotor, kinematics *KinematicsService) *MotorOrchestrator {
-	if len(motors) != 4 {
-		log.Panicf("Connected motors must be 4!")
+	if len(motors) != MotorCount {
+		log.Panicf("[ORCHESTRATOR] Connected motors must be exactly 4!")
 	}
 
 	return &MotorOrchestrator{
@@ -38,13 +27,14 @@ func NewMotorOrchestrator(motors []domain.IMotor, kinematics *KinematicsService)
 
 func (m *MotorOrchestrator) GetAllAggregatedConfig(ctx context.Context) ([]domain.MotorConfig, error) {
 	configs := make([]domain.MotorConfig, len(m.motors))
-	for i, config := range m.motors {
-		conf, err := config.GetConfig(ctx)
-		configs[i] = *conf
-		if err == nil {
+	for i, motor := range m.motors {
+		conf, err := motor.GetConfig(ctx)
+		if err != nil {
+			log.Printf("[ORCHESTRATOR] Failed to get config from motor %d: %v", i, err)
 			configs[i] = domain.MotorConfig{}
+			continue
 		}
-
+		configs[i] = *conf
 	}
 
 	return configs, nil
@@ -52,7 +42,6 @@ func (m *MotorOrchestrator) GetAllAggregatedConfig(ctx context.Context) ([]domai
 
 func (m *MotorOrchestrator) GetAllAggregatedStatus(ctx context.Context) ([]*domain.MotorStatus, error) {
 	statuses := make([]*domain.MotorStatus, len(m.motors))
-
 	errors := make(chan error, len(m.motors))
 	var wg sync.WaitGroup
 
@@ -60,7 +49,6 @@ func (m *MotorOrchestrator) GetAllAggregatedStatus(ctx context.Context) ([]*doma
 		wg.Add(1)
 		go func(idx int, m domain.IMotor) {
 			defer wg.Done()
-
 			status, err := m.GetStatus(ctx)
 			if err != nil {
 				errors <- err
@@ -92,13 +80,23 @@ func (m *MotorOrchestrator) Calibrate(ctx context.Context, speed float64) error 
 }
 
 func (m *MotorOrchestrator) GetCurrentPosition() domain.Point {
+	m.kinematics.mu.RLock()
+	defer m.kinematics.mu.RUnlock()
 	return m.kinematics.currentPosition
-}
-
-func (m *MotorOrchestrator) IsCalibrated() bool {
-	return m.kinematics.currentPosition != (domain.Point{})
 }
 
 func (m *MotorOrchestrator) GoHome(ctx context.Context, speed float64) error {
 	return m.kinematics.MoveTo(ctx, domain.Point{X: 0, Y: 0}, speed)
+}
+
+func (m *MotorOrchestrator) GetConfig() *config.GlobalConfig {
+	return m.kinematics.cfg
+}
+
+func (m *MotorOrchestrator) Sync() {
+	m.kinematics.SyncConfig()
+}
+
+func (m *MotorOrchestrator) IsCalibrated() bool {
+	return m.kinematics.currentPosition != (domain.Point{})
 }
