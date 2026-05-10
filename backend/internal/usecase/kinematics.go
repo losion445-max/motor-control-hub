@@ -21,6 +21,10 @@ type KinematicsService struct {
 	currentAbsoluteSteps [MotorCount]int
 }
 
+func (s *KinematicsService) SetCurrentPosition(pos domain.Point) {
+	s.currentPosition = pos
+}
+
 func NewKinematicsService(cfg *config.GlobalConfig, motorInstances []domain.IMotor) (*KinematicsService, error) {
 	if len(motorInstances) != MotorCount {
 		return nil, fmt.Errorf("kinematics service requires exactly %d motors, got %d", MotorCount, len(motorInstances))

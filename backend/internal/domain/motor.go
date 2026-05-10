@@ -28,6 +28,7 @@ type IMotor interface {
 	Move(ctx context.Context, steps int, speed float64) error
 	Stop(ctx context.Context) error
 	GetStatus(ctx context.Context) (*MotorStatus, error)
+	SetEnabled(ctx context.Context, enabled bool) error
 }
 
 type MotorDiscover interface {

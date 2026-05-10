@@ -107,3 +107,29 @@ func (c *MotorClient) Stop(ctx context.Context) error {
 	return nil
 
 }
+
+func (c *MotorClient) SetEnabled(ctx context.Context, enabled bool) error {
+	endpoint := "/enable"
+	if !enabled {
+		endpoint = "/disable"
+	}
+
+	url := fmt.Sprintf("http://%s%s", c.config.CurrentIP, endpoint)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return fmt.Errorf("[MOTOR-%d] failed to create enable/disable request: %w", c.config.MotorID, err)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("[MOTOR-%d] %s cannot be reached: %w", c.config.MotorID, url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("[MOTOR-%d] %s returned status: %d", c.config.MotorID, url, resp.StatusCode)
+	}
+
+	return nil
+}

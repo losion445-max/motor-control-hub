@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 
@@ -65,6 +66,28 @@ func (m *MotorOrchestrator) GetAllAggregatedStatus(ctx context.Context) ([]*doma
 	}
 
 	return statuses, nil
+}
+
+func (orc *MotorOrchestrator) MoveSingleMotor(ctx context.Context, motorID int, steps int, speed float64) error {
+	idx := motorID - 1
+	if idx < 0 || idx >= len(orc.kinematics.Motors) {
+		return fmt.Errorf("motor with id %d not found", motorID)
+	}
+
+	return orc.kinematics.Motors[idx].Move(ctx, steps, speed)
+}
+
+func (orc *MotorOrchestrator) SetMotorsEnabled(ctx context.Context, enabled bool) error {
+	for _, m := range orc.kinematics.Motors {
+		if err := m.SetEnabled(ctx, enabled); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (orc *MotorOrchestrator) ManualSyncPosition(x, y float64) {
+	orc.kinematics.SetCurrentPosition(domain.Point{X: x, Y: y})
 }
 
 func (m *MotorOrchestrator) MoveToPoint(ctx context.Context, x, y, speed float64) error {
