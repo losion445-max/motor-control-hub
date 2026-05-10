@@ -9,7 +9,7 @@ import (
 	"github.com/losion445-max/motor-control-hub/internal/domain"
 )
 
-const MotorCount = 0
+const MotorCount = 4
 
 type MotorFactory func(cfg *domain.MotorConfig) domain.IMotor
 
