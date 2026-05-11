@@ -1,27 +1,54 @@
 import axios from 'axios';
-import type { HubConfig, SystemStatus } from '../domain/types';
+import type { 
+  FullConfig, 
+  SystemStatus, 
+  MoveRequest, 
+  SingleMotorMoveRequest,
+  KinematicsConfig 
+} from '../domain/types';
 
 const api = axios.create({
   baseURL: '/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
 export const hubApi = {
-  getConfig: () => api.get<HubConfig>('/config').then(res => res.data),
   
-  getStatus: () => api.get<SystemStatus>('/status').then(res => res.data),
+  motion: {
+    moveTo: (data: MoveRequest) => 
+      api.post('/move', data),
 
-  moveTo: (x: number, y: number, speed: number) => 
-    api.post('/move', { x, y, speed }),
+    home: (speed: number) => 
+      api.post('/home', { speed }),
 
-  home: (speed: number) => 
-    api.post('/home', { speed }),
+    stop: () => 
+      api.post('/stop'),
 
-  stop: () => 
-    api.post('/stop'),
+    calibrate: (speed: number) => 
+      api.post('/calibrate', { speed }),
+  },
 
-  calibrate: (speed: number) => 
-    api.post('/calibrate', { speed }),
+  config: {
+    get: () => 
+      api.get<FullConfig>('/config').then(res => res.data),
 
-  updateDimensions: (width: number, height: number) => 
-    api.post('/dimensions', { width, height }).then(res => res.data)
+    update: (data: Partial<KinematicsConfig>) => 
+      api.post('/config', data).then(res => res.data),
+  },
+
+  diag: {
+    getStatus: () => 
+      api.get<SystemStatus>('/status').then(res => res.data),
+
+    moveMotor: (data: SingleMotorMoveRequest) => 
+      api.post('/motors/move-single', data),
+
+    setEnable: (enabled: boolean) => 
+      api.post('/motors/enable', { enabled }),
+
+    syncPosition: (x: number, y: number) => 
+      api.post('/position/sync', { x, y }),
+  }
 };
