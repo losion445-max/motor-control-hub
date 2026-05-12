@@ -1,6 +1,8 @@
 package network
 
-import "net/http"
+import (
+	"net/http"
+)
 
 func (h *MotorHandler) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	cfg := h.orchestrator.GetConfig()
