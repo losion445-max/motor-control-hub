@@ -1,303 +1,174 @@
-import React, { useState, useEffect } from 'react';
-import { hubApi } from './infrastructure/api';
-import type { SystemStatus, HubConfig } from './domain/types';
+import { useState, useEffect } from 'react';
+import { useHub } from './hooks/useHub';
 
-const Sidebar = ({ activeTab, onTabChange }: { activeTab: string; onTabChange: (tab: string) => void }) => (
-  <aside className="w-[220px] shrink-0 flex flex-col gap-2">
-    <div className="flex items-center gap-2 font-semibold text-sm text-[#e6edf3] px-2 pb-4 border-b border-[#30363d] mb-1">
-      <div className="w-5 h-5 bg-[#1f6feb] rounded flex items-center justify-center">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="white"><circle cx="6" cy="6" r="4"/></svg>
-      </div>
-      Motor Hub
-    </div>
+import { DashboardView } from './features/dashboard';
+import { ConfigView } from './features/config';
+import { DiagnosticView } from './features/diagnostic'
 
-    {[
-      { id: 'dashboard', label: 'Dashboard' },
-      { id: 'config',    label: 'Configuration' },
-    ].map(({ id, label }) => (
-      <div
-        key={id}
-        onClick={() => onTabChange(id)}
-        className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm select-none transition-colors
-          ${activeTab === id
-            ? 'bg-[#1f6feb26] text-[#58a6ff] font-semibold'
-            : 'text-[#8b949e] hover:bg-[#6e768126] hover:text-[#e6edf3]'
-          }`}
-      >
-        {label}
-      </div>
-    ))}
-  </aside>
-);
+import { StatusBadge } from './components/statusBadge';
+import type { SystemStatus, FullConfig } from './domain/types';
 
-const GhBox = ({ header, children, noPadding = false }: {
-  header: React.ReactNode; children: React.ReactNode; noPadding?: boolean;
-}) => (
-  <div className="bg-[#161b22] border border-[#30363d] rounded-md overflow-hidden">
-    <div className="px-4 py-2.5 border-b border-[#30363d] font-semibold text-sm text-[#e6edf3] flex items-center gap-2">
-      {header}
-    </div>
-    <div className={noPadding ? '' : 'p-4'}>{children}</div>
-  </div>
-);
+type Tab = 'dash' | 'config' | 'diag';
 
-const MotorCard = ({ motor }: { motor: any }) => (
-  <div className="bg-[#010409] border border-[#21262d] rounded-md px-3 py-2.5">
-    <div className="text-[11px] text-[#6e7681] mb-1 font-mono">motor_{motor.motor_id}</div>
-    <div className="font-mono text-base font-semibold text-[#e6edf3]">
-      {motor.current_steps} <span className="text-[10px] text-[#6e7681] font-normal">steps</span>
-    </div>
-    <div className="flex justify-between items-center mt-2">
-      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full
-        ${motor.enabled
-          ? 'bg-[#2ea04326] text-[#3fb950]'
-          : 'bg-[#f8514926] text-[#f85149]'
-        }`}>
-        {motor.enabled ? 'ACTIVE' : 'OFF'}
-      </span>
-      <span className="text-[11px] font-mono text-[#8b949e]">{motor.speed_rps} rps</span>
-    </div>
-  </div>
-);
+export default function App() {
+const [activeTab, setActiveTab] = useState<Tab>('dash');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [uptime, setUptime] = useState(0);
 
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [config, setConfig]       = useState<HubConfig | null>(null);
-  const [status, setStatus]       = useState<SystemStatus | null>(null);
-  const [speed, setSpeed]         = useState(15.0);
-  const [isLive, setIsLive]       = useState(false);
-  const [newWidth, setNewWidth]   = useState('');
-  const [newHeight, setNewHeight] = useState('');
+  const { status: rawStatus, config: rawConfig, isLive, refreshConfig } = useHub();
 
-  const refreshConfig = () => {
-    hubApi.getConfig().then(data => {
-      setConfig(data);
-      setNewWidth(data.frame_width.toString());
-      setNewHeight(data.frame_height.toString());
-    }).catch(console.error);
+  // --- STRICT MOCK DATA ---
+  // Используем интерфейс вместо any. Теперь TS проверит каждое поле.
+  const status: SystemStatus = rawStatus ?? {
+    timestamp: Date.now(),
+    position: { x: 125.5, y: 80.2 },
+    is_calibrated: true,
+    motors: [
+      { motor_id: 1, enabled: true, infinite: false, current_steps: 1024, target_steps: 1024, speed_rps: 0, wifi_rssi: -52, online: true },
+      { motor_id: 2, enabled: true, infinite: false, current_steps: 850, target_steps: 850, speed_rps: 0, wifi_rssi: -48, online: true },
+      { motor_id: 3, enabled: true, infinite: false, current_steps: 1200, target_steps: 1200, speed_rps: 0, wifi_rssi: -55, online: true },
+      { motor_id: 4, enabled: false, infinite: false, current_steps: 0, target_steps: 0, speed_rps: 0, wifi_rssi: 0, online: false },
+    ],
   };
 
-
-  useEffect(() => { refreshConfig(); }, []);
+  const config: FullConfig = rawConfig ?? {
+    global: {
+      kinematics: { 
+        width: 500, 
+        height: 400, 
+        diameter: 20.0, 
+        steps_per_rev: 200 
+      },
+      motor_mapping: [2, 3, 1, 4]
+    },
+    motors_hardware: [
+      { motor_id: 1, step_plus: 12, step_minus: 13, dir_plus: 14, dir_minus: 15, steps_per_rev: 200, pulley_mm: 20 },
+      { motor_id: 2, step_plus: 16, step_minus: 17, dir_plus: 18, dir_minus: 19, steps_per_rev: 200, pulley_mm: 20 },
+      { motor_id: 3, step_plus: 21, step_minus: 22, dir_plus: 23, dir_minus: 24, steps_per_rev: 200, pulley_mm: 20 },
+      { motor_id: 4, step_plus: 25, step_minus: 26, dir_plus: 27, dir_minus: 28, steps_per_rev: 200, pulley_mm: 20 },
+    ]
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
-      hubApi.getStatus()
-        .then(data => { setStatus(data); setIsLive(true); })
-        .catch(() => setIsLive(false));
-    }, 200);
+      setUptime(prev => prev + 60000);
+    }, 60000);
     return () => clearInterval(timer);
   }, []);
 
-  const handleUpdateDimensions = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await hubApi.updateDimensions(parseFloat(newWidth), parseFloat(newHeight));
-      refreshConfig();
-      setActiveTab('dashboard');
-      alert('Configuration updated! Remember to re-calibrate.');
-    } catch { alert('Update failed'); }
-  };
-
-  const getPositionStyles = () => {
-    if (!status || !config) return { left: '50%', top: '50%' };
-    return {
-      left: `${(status.position.x / config.frame_width)  * 100}%`,
-      top:  `${(status.position.y / config.frame_height) * 100}%`,
-    };
-  };
+  // if (!rawConfig || !rawStatus) {
+  //   return (
+  //     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0d1117] font-mono uppercase tracking-widest p-4 text-center">
+  //       <div className="mb-4 animate-pulse text-lg md:text-xl text-[#58a6ff]">INITIALIZING_CORE_SYSTEMS...</div>
+  //       <div className="w-full max-w-xs h-px bg-[#30363d] overflow-hidden relative">
+  //         <div className="absolute inset-0 bg-[#58a6ff] animate-[progress_2s_infinite]" />
+  //       </div>
+  //     </div>
+  //   );
+  // }
+  
 
   return (
-    <div className="min-h-screen bg-[#0d1117] text-[#e6edf3] p-4 flex gap-4 font-sans text-sm">
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+    <div className="flex min-h-screen flex-col lg:flex-row bg-[#0d1117] font-mono text-[#e6edf3] selection:bg-[#58a6ff33]">
+      
+      <header className="flex lg:hidden items-center justify-between p-4 border-b border-[#30363d] bg-[#010409] z-50">
+        <h1 className="text-sm font-black tracking-tighter text-[#58a6ff]">
+          MOTOR_HUB <span className="opacity-50">v1.0.4</span>
+        </h1>
+        <button 
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="px-3 py-1 border border-[#30363d] text-[10px] font-bold active:bg-[#58a6ff11]"
+        >
+          {isMenuOpen ? 'CLOSE_MENU' : 'OPEN_MENU'}
+        </button>
+      </header>
 
-      <main className="flex-1 flex flex-col gap-4 min-w-0">
+      <aside className={`
+        ${isMenuOpen ? 'flex' : 'hidden'} 
+        lg:flex fixed lg:relative inset-0 z-40 lg:z-auto
+        w-full lg:w-72 flex-col border-r border-[#30363d] bg-[#010409] p-6
+      `}>
+        <div className="hidden lg:block mb-10">
+          <h1 className="text-xl font-black tracking-tighter text-[#58a6ff]">
+            MOTOR_HUB <span className="font-normal opacity-50 text-[10px]">v1.0.4</span>
+          </h1>
+          <div className="mt-1 tracking-[0.3em] text-[9px] text-[#8b949e]">ROSTOV_ON_DON // LAB</div>
+        </div>
 
-        {/* ── Header ── */}
-        <header className="flex justify-between items-start pb-4 border-b border-[#30363d]">
-          <div>
-            <div className="text-xl font-semibold text-[#e6edf3]">
-              {activeTab === 'dashboard' ? 'System Control' : 'System Configuration'}
+        <nav className="flex flex-1 flex-col gap-2 mt-12 lg:mt-0">
+          {[
+            { id: 'dash', label: 'Dashboard', icon: '01' },
+            { id: 'config', label: 'Kinematics', icon: '02' },
+            { id: 'diag', label: 'Diagnostics', icon: '03' },
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id as Tab);
+                setIsMenuOpen(false);
+              }}
+              className={`
+                group flex items-center gap-4 border p-4 lg:p-3 text-sm lg:text-xs font-bold uppercase transition-all duration-150
+                ${
+                  activeTab === item.id
+                    ? 'border-[#58a6ff] bg-[#58a6ff11] text-[#58a6ff] shadow-[0_0_15px_rgba(88,166,255,0.1)]'
+                    : 'border-transparent text-[#8b949e] hover:border-[#30363d] hover:text-[#e6edf3]'
+                }
+              `}
+            >
+              <span className="opacity-40 group-hover:opacity-100">[{item.icon}]</span>
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="space-y-3 border-t border-[#30363d] pt-6 mt-4">
+          <StatusBadge label={isLive || !rawStatus ? 'LINK_STABLE' : 'LINK_LOST'} active={isLive || !rawStatus} pulse />
+          <div className="leading-relaxed text-[9px] text-[#6e7681]">
+            SYSTEM_UPTIME: {(uptime / 1000 / 60).toFixed(1)}M <br />
+            API_VERSION: 2.4.0-GO
+          </div>
+        </div>
+      </aside>
+
+      <main className="flex h-screen flex-1 flex-col overflow-hidden bg-[#0d1117]">
+        <header className="hidden sm:flex h-16 shrink-0 items-center justify-between border-b border-[#30363d] bg-[#161b22]/30 px-4 lg:px-8 backdrop-blur-md">
+          <div className="flex items-center gap-4 lg:gap-8">
+            <div className="font-bold tracking-widest text-[9px] lg:text-[10px] text-[#8b949e]">
+              VIEW: <span className="text-[#e6edf3]">{activeTab.toUpperCase()}</span>
             </div>
-            <div className="text-xs text-[#8b949e] mt-0.5 font-mono">
-              {config?.frame_width}mm × {config?.frame_height}mm
+            <div className="h-4 w-px bg-[#30363d]" />
+            <div className="font-bold tracking-widest text-[9px] lg:text-[10px] text-[#8b949e]">
+              CALIB: <span className={status.is_calibrated ? "text-[#3fb950]" : "text-[#f85149]"}>
+                {status.is_calibrated ? "READY" : "REQUIRED"}
+              </span>
             </div>
           </div>
-          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border
-            ${isLive
-              ? 'bg-[#2ea04326] border-[#3fb95066] text-[#3fb950]'
-              : 'bg-[#f8514926] border-[#f8514966] text-[#f85149]'
-            }`}>
-            <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-[#3fb950] animate-pulse' : 'bg-[#f85149]'}`} />
-            {isLive ? 'ONLINE' : 'OFFLINE'}
+
+          <div className="text-[9px] lg:text-[10px] text-[#6e7681]">
+            TS: {new Date(status.timestamp).toLocaleTimeString()}
           </div>
         </header>
 
-        {/* ══════════════ DASHBOARD ══════════════ */}
-        {activeTab === 'dashboard' && (
-          <div className="grid grid-cols-[1fr_300px] gap-4">
-
-            {/* Left column */}
-            <div className="flex flex-col gap-4">
-              <GhBox header="Workspace Canvas">
-                <div
-                  className="aspect-square bg-[#010409] rounded-md relative cursor-crosshair overflow-hidden"
-                  onClick={(e) => {
-                    if (!config) return;
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    hubApi.moveTo(
-                      parseFloat((((e.clientX - rect.left) / rect.width)  * config.frame_width).toFixed(2)),
-                      parseFloat((((e.clientY - rect.top)  / rect.height) * config.frame_height).toFixed(2)),
-                      speed,
-                    );
-                  }}
-                >
-                  {/* Grid overlay */}
-                  <div className="absolute inset-0" style={{
-                    backgroundImage: 'linear-gradient(rgba(88,166,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(88,166,255,0.06) 1px, transparent 1px)',
-                    backgroundSize: '10% 10%',
-                  }} />
-                  {/* Crosshair */}
-                  <div
-                    className="absolute w-5 h-5 -ml-2.5 -mt-2.5 transition-all duration-300 ease-out"
-                    style={getPositionStyles()}
-                  >
-                    <div className="absolute top-1/2 left-0 right-0 h-px bg-[#58a6ff]" />
-                    <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#58a6ff]" />
-                    <div className="absolute top-1/2 left-1/2 w-1.5 h-1.5 -translate-x-1/2 -translate-y-1/2 bg-[#58a6ff] rounded-full shadow-[0_0_6px_#58a6ff]" />
-                  </div>
-                </div>
-              </GhBox>
-
-              <GhBox header="Speed Control">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-[#8b949e] whitespace-nowrap">Speed</span>
-                  <input
-                    type="range" min="1" max="50" step="0.5" value={speed}
-                    onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                    className="flex-1 accent-[#58a6ff]"
-                  />
-                  <span className="font-mono text-xs text-[#58a6ff] min-w-[52px] text-right">
-                    {speed.toFixed(1)} rps
-                  </span>
-                </div>
-              </GhBox>
-            </div>
-
-            {/* Right column */}
-            <div className="flex flex-col gap-4">
-
-              <GhBox header="Position">
-                <div className="font-mono flex flex-col gap-1.5">
-                  {(['X', 'Y'] as const).map((axis) => (
-                    <div key={axis} className="flex items-baseline gap-2">
-                      <span className="text-[#6e7681] text-[11px] w-4">{axis}</span>
-                      <span className="text-[#58a6ff] text-[22px] font-semibold leading-none">
-                        {(axis === 'X' ? status?.position.x : status?.position.y)?.toFixed(1) ?? '—'}
-                      </span>
-                      <span className="text-[#6e7681] text-[11px]">mm</span>
-                    </div>
-                  ))}
-                </div>
-              </GhBox>
-
-              <GhBox header="Commands">
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => hubApi.stop()}
-                    className="py-1.5 px-3 rounded-md text-[13px] font-medium cursor-pointer bg-[#f8514926] border border-[#f8514966] text-[#f85149] hover:bg-[#f8514940] transition-colors"
-                  >
-                    STOP
-                  </button>
-                  <button
-                    onClick={() => hubApi.home(speed)}
-                    className="py-1.5 px-3 rounded-md text-[13px] font-medium cursor-pointer bg-[#21262d] border border-[#30363d] text-[#e6edf3] hover:bg-[#30363d] hover:border-[#8b949e] transition-colors"
-                  >
-                    HOME
-                  </button>
-                  <button
-                    onClick={() => hubApi.calibrate(speed)}
-                    className="py-1.5 px-3 rounded-md text-[13px] font-medium cursor-pointer bg-[#21262d] border border-[#30363d] text-[#e6edf3] hover:bg-[#30363d] hover:border-[#8b949e] transition-colors"
-                  >
-                    CAL
-                  </button>
-                </div>
-              </GhBox>
-
-              <GhBox header="Motors" noPadding>
-                <div className="grid grid-cols-2 gap-2 p-2">
-                  {status?.motors.map(m => <MotorCard key={m.motor_id} motor={m} />)}
-                </div>
-              </GhBox>
-
-            </div>
+        <div className="custom-scrollbar flex-1 overflow-y-auto p-4 lg:p-8">
+          <div className="mx-auto max-w-6xl">
+            {activeTab === 'dash' && <DashboardView status={status} config={config} />}
+            {activeTab === 'config' && <ConfigView config={config} onRefresh={refreshConfig} />}
+            {activeTab === 'diag' && <DiagnosticView motors={status.motors} />}
           </div>
-        )}
-
-        {/* ══════════════ CONFIG ══════════════ */}
-        {activeTab === 'config' && (
-          <div className="flex flex-col gap-4 max-w-[640px]">
-
-            <GhBox header="Physical Frame Settings">
-              <form onSubmit={handleUpdateDimensions} className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { label: 'Frame Width (mm)',  val: newWidth,  set: setNewWidth  },
-                    { label: 'Frame Height (mm)', val: newHeight, set: setNewHeight },
-                  ].map(({ label, val, set }) => (
-                    <div key={label}>
-                      <label className="block text-xs font-semibold text-[#8b949e] mb-1.5">{label}</label>
-                      <input
-                        type="number"
-                        value={val}
-                        onChange={e => set(e.target.value)}
-                        className="w-full bg-[#010409] border border-[#30363d] rounded-md px-3 py-1.5 text-sm text-[#e6edf3] font-mono outline-none focus:border-[#58a6ff] focus:ring-2 focus:ring-[#1f6feb40]"
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-md text-xs bg-[#d2992226] border border-[#d2992240] text-[#d29922]">
-                  ⚠ Changes require re-calibration after applying.
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2 px-4 bg-[#238636] hover:bg-[#2ea043] border border-[#f0f6fc1a] rounded-md text-white text-sm font-medium cursor-pointer transition-colors"
-                >
-                  Apply Changes
-                </button>
-              </form>
-            </GhBox>
-
-            <GhBox header="Active Motor Hardware" noPadding>
-              <table className="w-full border-collapse text-xs">
-                <thead>
-                  <tr>
-                    {['ID', 'IP Address', 'Resolution', 'Pulley'].map(h => (
-                      <th key={h} className="text-left px-4 py-1.5 text-[11px] font-semibold text-[#8b949e] border-b border-[#30363d]">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {config?.motors.map((m, i) => (
-                    <tr key={m.motor_id} className={i < (config.motors.length - 1) ? 'border-b border-[#21262d]' : ''}>
-                      <td className="px-4 py-2 font-mono text-[#58a6ff]">#{m.motor_id}</td>
-                      <td className="px-4 py-2 font-mono text-[#e6edf3]">{m.ip_address}</td>
-                      <td className="px-4 py-2 font-mono text-[#8b949e]">{m.steps_per_rev} steps</td>
-                      <td className="px-4 py-2 font-mono text-[#8b949e]">{m.pulley_mm} mm</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </GhBox>
-
-          </div>
-        )}
-
+        </div>
       </main>
+
+      <style>{`
+        @keyframes progress {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
+      `}</style>
     </div>
   );
 }
