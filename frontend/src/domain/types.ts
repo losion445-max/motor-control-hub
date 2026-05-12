@@ -20,7 +20,7 @@ export interface KinematicsConfig {
 export interface FullConfig {
   global: {
     kinematics: KinematicsConfig;
-    motor_mapping: [number, number, number, number]; // Соответствие ID углам рамы
+    motor_mapping: [number, number, number, number];
   };
   motors_hardware: MotorHardwareConfig[];
 }

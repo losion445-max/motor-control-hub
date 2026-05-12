@@ -6,7 +6,6 @@ import { ConfigView } from './features/config';
 import { DiagnosticView } from './features/diagnostic'
 
 import { StatusBadge } from './components/statusBadge';
-import type { SystemStatus, FullConfig } from './domain/types';
 
 type Tab = 'dash' | 'config' | 'diag';
 
@@ -18,36 +17,35 @@ const [activeTab, setActiveTab] = useState<Tab>('dash');
   const { status: rawStatus, config: rawConfig, isLive, refreshConfig } = useHub();
 
   // --- STRICT MOCK DATA ---
-  // Используем интерфейс вместо any. Теперь TS проверит каждое поле.
-  const status: SystemStatus = rawStatus ?? {
-    timestamp: Date.now(),
-    position: { x: 125.5, y: 80.2 },
-    is_calibrated: true,
-    motors: [
-      { motor_id: 1, enabled: true, infinite: false, current_steps: 1024, target_steps: 1024, speed_rps: 0, wifi_rssi: -52, online: true },
-      { motor_id: 2, enabled: true, infinite: false, current_steps: 850, target_steps: 850, speed_rps: 0, wifi_rssi: -48, online: true },
-      { motor_id: 3, enabled: true, infinite: false, current_steps: 1200, target_steps: 1200, speed_rps: 0, wifi_rssi: -55, online: true },
-      { motor_id: 4, enabled: false, infinite: false, current_steps: 0, target_steps: 0, speed_rps: 0, wifi_rssi: 0, online: false },
-    ],
-  };
+  // const status: SystemStatus = rawStatus //?? {
+  //   timestamp: Date.now(),
+  //   position: { x: 125.5, y: 80.2 },
+  //   is_calibrated: true,
+  //   motors: [
+  //     { motor_id: 1, enabled: true, infinite: false, current_steps: 1024, target_steps: 1024, speed_rps: 0, wifi_rssi: -52, online: true },
+  //     { motor_id: 2, enabled: true, infinite: false, current_steps: 850, target_steps: 850, speed_rps: 0, wifi_rssi: -48, online: true },
+  //     { motor_id: 3, enabled: true, infinite: false, current_steps: 1200, target_steps: 1200, speed_rps: 0, wifi_rssi: -55, online: true },
+  //     { motor_id: 4, enabled: false, infinite: false, current_steps: 0, target_steps: 0, speed_rps: 0, wifi_rssi: 0, online: false },
+  //   ],
+  // };
 
-  const config: FullConfig = rawConfig ?? {
-    global: {
-      kinematics: { 
-        width: 500, 
-        height: 400, 
-        diameter: 20.0, 
-        steps_per_rev: 200 
-      },
-      motor_mapping: [2, 3, 1, 4]
-    },
-    motors_hardware: [
-      { motor_id: 1, step_plus: 12, step_minus: 13, dir_plus: 14, dir_minus: 15, steps_per_rev: 200, pulley_mm: 20 },
-      { motor_id: 2, step_plus: 16, step_minus: 17, dir_plus: 18, dir_minus: 19, steps_per_rev: 200, pulley_mm: 20 },
-      { motor_id: 3, step_plus: 21, step_minus: 22, dir_plus: 23, dir_minus: 24, steps_per_rev: 200, pulley_mm: 20 },
-      { motor_id: 4, step_plus: 25, step_minus: 26, dir_plus: 27, dir_minus: 28, steps_per_rev: 200, pulley_mm: 20 },
-    ]
-  };
+  // const config: FullConfig = rawConfig //?? {
+  //   global: {
+  //     kinematics: { 
+  //       width: 500, 
+  //       height: 400, 
+  //       diameter: 20.0, 
+  //       steps_per_rev: 200 
+  //     },
+  //     motor_mapping: [2, 3, 1, 4]
+  //   },
+  //   motors_hardware: [
+  //     { motor_id: 1, step_plus: 12, step_minus: 13, dir_plus: 14, dir_minus: 15, steps_per_rev: 200, pulley_mm: 20 },
+  //     { motor_id: 2, step_plus: 16, step_minus: 17, dir_plus: 18, dir_minus: 19, steps_per_rev: 200, pulley_mm: 20 },
+  //     { motor_id: 3, step_plus: 21, step_minus: 22, dir_plus: 23, dir_minus: 24, steps_per_rev: 200, pulley_mm: 20 },
+  //     { motor_id: 4, step_plus: 25, step_minus: 26, dir_plus: 27, dir_minus: 28, steps_per_rev: 200, pulley_mm: 20 },
+  //   ]
+  // };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -56,16 +54,19 @@ const [activeTab, setActiveTab] = useState<Tab>('dash');
     return () => clearInterval(timer);
   }, []);
 
-  // if (!rawConfig || !rawStatus) {
-  //   return (
-  //     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0d1117] font-mono uppercase tracking-widest p-4 text-center">
-  //       <div className="mb-4 animate-pulse text-lg md:text-xl text-[#58a6ff]">INITIALIZING_CORE_SYSTEMS...</div>
-  //       <div className="w-full max-w-xs h-px bg-[#30363d] overflow-hidden relative">
-  //         <div className="absolute inset-0 bg-[#58a6ff] animate-[progress_2s_infinite]" />
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  if (!rawConfig || !rawStatus) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0d1117] font-mono uppercase tracking-widest p-4 text-center">
+        <div className="mb-4 animate-pulse text-lg md:text-xl text-[#58a6ff]">INITIALIZING_CORE_SYSTEMS...</div>
+        <div className="w-full max-w-xs h-px bg-[#30363d] overflow-hidden relative">
+          <div className="absolute inset-0 bg-[#58a6ff] animate-[progress_2s_infinite]" />
+        </div>
+      </div>
+    );
+  }
+
+  const status = rawStatus;
+  const config = rawConfig;
   
 
   return (

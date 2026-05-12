@@ -34,7 +34,7 @@ export const hubApi = {
     get: () => 
       api.get<FullConfig>('/config').then(res => res.data),
 
-    update: (data: Partial<KinematicsConfig>) => 
+    update: (data: Partial<KinematicsConfig & { motor_mapping: number[] }>) => 
       api.post('/config', data).then(res => res.data),
   },
 
