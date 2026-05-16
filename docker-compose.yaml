@@ -7,8 +7,6 @@ services:
       context: ./backend
     expose:
       - "8080"
-    networks:
-      - default
     
   frontend:
     restart: always
@@ -18,10 +16,3 @@ services:
       context: ./frontend
     ports:
       - "80:80"
-    networks:
-      - default
-    
-
-networks:
-  default:
-    name: motor-control-hub-net
