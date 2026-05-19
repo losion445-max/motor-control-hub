@@ -20,6 +20,19 @@ type MotorClient struct {
 	http   *http.Client
 }
 
+type MotorFactory struct{}
+
+func NewMotorFactory() domain.IMotorFactory {
+	return &MotorFactory{}
+}
+
+func (f *MotorFactory) CreateMotor(cfg *domain.MotorConfig) (domain.IMotor, error) {
+	// Вызываем твой конструктор, который возвращает (*MotorClient, error)
+	// Так как *MotorClient реализует интерфейс domain.IMotor, Go это легко проглотит!
+	client := NewMotorClient(cfg)
+	return client, nil
+}
+
 func NewMotorClient(c *domain.MotorConfig) *MotorClient {
 	return &MotorClient{
 		config: c,

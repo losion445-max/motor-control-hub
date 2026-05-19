@@ -13,7 +13,7 @@ const MotorCount = 4
 
 type MotorFactory func(cfg *domain.MotorConfig) domain.IMotor
 
-func BootstrapMotors(ctx context.Context, scanner domain.MotorDiscover, factory MotorFactory) ([]domain.IMotor, error) {
+func BootstrapMotors(ctx context.Context, scanner domain.MotorDiscover, factory domain.IMotorFactory) ([]domain.IMotor, error) {
 	log.Println("[BOOTSTRAP] Looking for motors...")
 
 	configs, err := scanner.Discover(ctx)
@@ -36,7 +36,12 @@ func BootstrapMotors(ctx context.Context, scanner domain.MotorDiscover, factory 
 			return nil, fmt.Errorf("sequence error: expected ID %d, but got %d at position %d", expectedID, cfg.MotorID, i)
 		}
 
-		motors = append(motors, factory(&cfg))
+		motor, err := factory.CreateMotor(&cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create motor ID %d: %w", cfg.MotorID, err)
+		}
+
+		motors = append(motors, motor)
 	}
 
 	log.Printf("[BOOTSTRAP] Successfully initialized %d motors", len(motors))

@@ -34,3 +34,7 @@ type IMotor interface {
 type MotorDiscover interface {
 	Discover(ctx context.Context) ([]MotorConfig, error)
 }
+
+type IMotorFactory interface {
+	CreateMotor(cfg *MotorConfig) (IMotor, error)
+}

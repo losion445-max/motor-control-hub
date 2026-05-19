@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/losion445-max/motor-control-hub/internal/config"
-	"github.com/losion445-max/motor-control-hub/internal/infrastructure/esp32"
+	"github.com/losion445-max/motor-control-hub/internal/infrastructure/esp32/udpclient"
 	"github.com/losion445-max/motor-control-hub/internal/infrastructure/network"
 	"github.com/losion445-max/motor-control-hub/internal/usecase"
 )
@@ -26,7 +26,7 @@ func main() {
 	appConfig.MotorMapping = [4]int{2, 3, 4, 1}
 
 	scanner := network.NewARPScanner("wlan1", 500*time.Millisecond)
-	motors, err := usecase.BootstrapMotors(ctx, scanner, esp32.NewMotorClientFactory())
+	motors, err := usecase.BootstrapMotors(ctx, scanner, udpclient.NewMotorUDPFactory())
 	if err != nil {
 		log.Fatalf("[MAIN] Failed to initialize system: %v", err)
 	}
