@@ -15,9 +15,8 @@
 // ============================================================
 
 namespace Domain {
-    const float MAX_HZ        = 300000.0f; // 300 кГц — жесткий лимит прерываний ESP32
-    const float MIN_SPEED_RPS = 1.0f;
-    const float MAX_SPEED_RPS = 100.0f;
+    const float MAX_HZ = 300000.0f; // 300 кГц — жесткий лимит прерываний ESP32
+    const float MIN_HZ = 1.0f;      // Минимальная частота таймера
 
     // Спецификация исполнительного механизма
     struct DeviceConfig {
@@ -40,7 +39,7 @@ namespace Domain {
         volatile bool is_enabled     = false;
         volatile bool is_infinite    = false;
         volatile bool step_phase     = false; // false=LOW, true=HIGH
-        volatile float current_speed = 5.0f;
+        volatile float current_hz    = 100.0f; // Храним честную частоту в Гц
         volatile uint8_t last_seq    = 0;
     };
 
@@ -52,14 +51,16 @@ namespace Domain {
         uint8_t  state_cmd;   // 0 - IDLE, 1 - STREAMING, 2 - ESTOP
         uint8_t  seq;         // Порядковый номер пакета
         int32_t  target_step; // 4 байта
-        float    speed_rps;   // 4 байта
+        float    linear_speed;// Переименовали speed_rps -> скорость из Go (мм/сек). Размер те же 4 байта float.
     };
     #pragma pack(pop)
 
     class MotionCalculators {
     public:
-        static float VelocityToHz(float meters_per_second, const DeviceConfig& spec) {
-            return fabsf(meters_per_second) * (float)spec.steps_per_rev / spec.distance_per_rev;
+        static float VelocityToHz(float mm_per_second, const DeviceConfig& spec) {
+            // Переводим скорость из мм/сек в м/сек, так как в формуле pulley_diameter / 1000.0f
+            float meters_per_second = fabsf(mm_per_second) / 1000.0f;
+            return meters_per_second * (float)spec.steps_per_rev / spec.distance_per_rev;
         }
     };
 }
@@ -134,7 +135,7 @@ namespace Infrastructure {
         }
 
         static void ApplyTimerFrequency(float hz) {
-            if (hz < 0.01f) hz = 0.01f;
+            if (hz < Domain::MIN_HZ) hz = Domain::MIN_HZ;
             if (hz > Domain::MAX_HZ) hz = Domain::MAX_HZ;
 
             uint64_t alarm_value = (uint64_t)(500000.0f / hz); // 2 прерывания на импульс
@@ -174,7 +175,7 @@ namespace Infrastructure {
 namespace Usecase {
     class MotorController {
     public:
-        static void HandleTargetState(long steps, float rps, uint8_t state_cmd) {
+        static void HandleTargetState(long steps, float speed_hz, uint8_t state_cmd) {
             // Если прилетел стоп или ESTOP (state_cmd == 0 или 2)
             if (state_cmd == 0 || state_cmd == 2) {
                 Infrastructure::LowLevelDriver::ForceStop(g_device_spec);
@@ -182,21 +183,21 @@ namespace Usecase {
             }
 
             if (steps == 0) return;
-            if (rps < Domain::MIN_SPEED_RPS) rps = Domain::MIN_SPEED_RPS;
-            if (rps > Domain::MAX_SPEED_RPS) rps = Domain::MAX_SPEED_RPS;
+            if (speed_hz < Domain::MIN_HZ) speed_hz = Domain::MIN_HZ;
+            if (speed_hz > Domain::MAX_HZ) speed_hz = Domain::MAX_HZ;
 
             // Если целевые шаги или скорость изменились — перенастраиваем таймер
-            if (g_engine.target_steps != llabs(steps) || g_engine.current_speed != rps || !g_engine.is_enabled) {
+            if (g_engine.target_steps != llabs(steps) || g_engine.current_hz != speed_hz || !g_engine.is_enabled) {
                 portENTER_CRITICAL(&Infrastructure::g_timer_mux);
                 g_engine.target_steps  = llabs(steps);
                 g_engine.current_steps = 0;
                 g_engine.step_phase    = false;
-                g_engine.current_speed = rps;
+                g_engine.current_hz    = speed_hz;
                 g_engine.is_infinite   = false;
                 portEXIT_CRITICAL(&Infrastructure::g_timer_mux);
 
                 Infrastructure::LowLevelDriver::SetDirection(steps > 0, g_device_spec);
-                Infrastructure::LowLevelDriver::ApplyTimerFrequency(rps);
+                Infrastructure::LowLevelDriver::ApplyTimerFrequency(speed_hz);
                 g_engine.is_enabled = true;
             }
         }
@@ -231,7 +232,6 @@ namespace Presentation {
 
             if (WiFi.status() == WL_CONNECTED) {
                 Serial.printf("\n[NET] Wi-Fi Connected. IP: %s\n", WiFi.localIP().toString().c_str());
-                // Запускаем UDP прослушивание порта
                 g_udp_socket.begin(UDP_PORT);
                 Serial.printf("[NET] UDP Receiver bound to port %d\n", UDP_PORT);
             } else {
@@ -240,7 +240,6 @@ namespace Presentation {
         }
 
         static void MountDiscoveryRoute() {
-            // Оставляем ТОЛЬКО эндпоинт конфига для ARPScanner хаба
             g_http_server.on("/config", HTTP_GET, []() {
                 String data = "{";
                 data += "\"motor_id\":"      + String(g_device_spec.motor_id);
@@ -264,29 +263,28 @@ namespace Presentation {
             int packet_size = g_udp_socket.parsePacket();
             if (packet_size == 0) return;
 
-            // Жестко проверяем размер бинарной структуры (ровно 12 байт)
             if (packet_size == sizeof(Domain::UdpCommandPacket)) {
                 Domain::UdpCommandPacket packet;
                 g_udp_socket.read((char*)&packet, sizeof(Domain::UdpCommandPacket));
 
-                // 1. Проверяем магический байт протокола и ID мотора
                 if (packet.magic != 0x5A || packet.motor_id != g_device_spec.motor_id) {
                     return;
                 }
 
-                // 2. Защита от дублирования/старых пакетов через Sequence ID
                 if (packet.seq != g_engine.last_seq) {
                     g_engine.last_seq = packet.seq;
 
-                    // 3. Отдаем данные в обработчик движения
+                    // ВАЖНО: Переводим входящую линейную скорость (мм/сек) в честную частоту (Гц)
+                    float calculated_hz = Domain::MotionCalculators::VelocityToHz(packet.linear_speed, g_device_spec);
+
+                    // Отдаем рассчитанную частоту шагов в обработчик
                     Usecase::MotorController::HandleTargetState(
                         packet.target_step, 
-                        packet.speed_rps, 
+                        calculated_hz, 
                         packet.state_cmd
                     );
                 }
             } else {
-                // Сливаем в унитаз битый пакет неверного размера
                 g_udp_socket.flush();
             }
         }
@@ -320,18 +318,15 @@ void setup() {
 }
 
 void loop() {
-    // Внутри рутин обрабатывается HTTP-клиент и читаются UDP пакеты из сокета
     Presentation::NetworkManager::HandleRuntimeMaintenance();
 
-    // Отладочный вывод каждые 5 секунд
     static unsigned long checkpoint = 0;
     if (millis() - checkpoint > 5000) {
-        Serial.printf("[IO] Run=%d | TargetSteps=%ld | CurrentSteps=%ld | Hz/Rps=%.1f | RSSI=%d\n",
+        Serial.printf("[IO] Run=%d | TargetSteps=%ld | CurrentSteps=%ld | TargetHz=%.1f | RSSI=%d\n",
                       g_engine.is_enabled, g_engine.target_steps, 
-                      g_engine.current_steps, g_engine.current_speed, WiFi.RSSI());
+                      g_engine.current_steps, g_engine.current_hz, WiFi.RSSI());
         checkpoint = millis();
     }
 
-    // Разгрузка для планировщика FreeRTOS IDLE task
     delay(1);
 }
