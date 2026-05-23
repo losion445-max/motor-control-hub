@@ -16,6 +16,22 @@ services:
     ports:
       - "80:80"
 
+  analytics:
+    build:
+      context: ./analytics
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+      mediamtx:
+        condition: service_started
+    environment:
+      - RTSP_URL=rtsp://mediamtx:8554/cam1
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONUNBUFFERED=1
+    ipc: host
+
   mediamtx:
     image: bluenviron/mediamtx:latest-ffmpeg
     restart: unless-stopped
