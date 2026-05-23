@@ -1,4 +1,3 @@
-
 services:
   backend:
     restart: always
@@ -7,7 +6,7 @@ services:
       context: ./backend
     expose:
       - "8080"
-    
+
   frontend:
     restart: always
     depends_on:
@@ -16,3 +15,19 @@ services:
       context: ./frontend
     ports:
       - "80:80"
+
+  mediamtx:
+    image: bluenviron/mediamtx:latest-ffmpeg
+    restart: unless-stopped
+    ports:
+      - "8554:8554" # RTSP (push/pull from scripts)
+      - "1935:1935" # RTMP (pust OBS)
+      - "8888:8888" # HLS (vudeo in browser with Hls.js)
+      - "8889:8889" # WebRTC (stream from browser with delay < 0.5 seconds)
+      - "9997:9997" # API mediaserver 
+
+    devices:
+      - "/dev/video2:/dev/video2"
+    environment:
+      - MTX_PATHS_CAM1_RUNONINIT=ffmpeg -f v4l2 -video_size 256x192 -i /dev/video2 -c:v libx264 -pix_fmt yuv420p -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:8554/cam1
+      - MTX_PATHS_CAM1_RUNONINITRESTART=yes
