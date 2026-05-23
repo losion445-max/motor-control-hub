@@ -39,3 +39,29 @@ docker-data/
 *~
 .fuse_hidden*
 .directory
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Виртуальное окружение ---
+venv/
+env/
+ENV/
+.venv/
+
+# --- Среды разработки ---
+.vscode/
+.idea/
+.DS_Store
+
+# --- Логи и базы данных ---
+*.log
+*.sqlite
+*.db
+
+# --- Твой специфичный мусор ---
+# Если у тебя есть какие-то временные файлы или дампы данных
+.tmp/
+*.json
