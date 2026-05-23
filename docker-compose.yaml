@@ -31,3 +31,9 @@ services:
     environment:
       - MTX_PATHS_CAM1_RUNONINIT=ffmpeg -f v4l2 -video_size 256x192 -i /dev/video2 -c:v libx264 -pix_fmt yuv420p -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:8554/cam1
       - MTX_PATHS_CAM1_RUNONINITRESTART=yes
+
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
