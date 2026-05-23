@@ -42,12 +42,6 @@ services:
       - "8889:8889" # WebRTC (stream from browser with delay < 0.5 seconds)
       - "9997:9997" # API mediaserver 
 
-    devices:
-      - "/dev/video2:/dev/video2"
-    environment:
-      - MTX_PATHS_CAM1_RUNONINIT=ffmpeg -f v4l2 -video_size 256x192 -i /dev/video2 -c:v libx264 -pix_fmt yuv420p -preset ultrafast -tune zerolatency -f rtsp rtsp://localhost:8554/cam1
-      - MTX_PATHS_CAM1_RUNONINITRESTART=yes
-
   redis:
     image: redis:alpine
     restart: unless-stopped
