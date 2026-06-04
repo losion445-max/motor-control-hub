@@ -1,16 +1,16 @@
 
-export const Panel = ({ 
-  title, 
-  children, 
-  className = "", 
+export const Panel = ({
+  title,
+  children,
+  className = "",
   onClick
-}: { 
-  title: string; 
-  children: React.ReactNode; 
+}: {
+  title: string;
+  children: React.ReactNode;
   className?: string;
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
 }) => (
-  <div 
+  <div
     onClick={onClick}
     className={`bg-[#161b22] border border-[#30363d] flex flex-col shadow-[0_4px_20px_rgba(0,0,0,0.5)] ${className} ${onClick ? 'cursor-pointer' : ''}`}>
     <div className="px-3 py-1.5 bg-[#30363d]/20 border-b border-[#30363d] flex justify-between items-center">
