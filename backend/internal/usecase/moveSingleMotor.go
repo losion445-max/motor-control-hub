@@ -8,11 +8,11 @@ import (
 )
 
 type MoveSingleMotor struct {
-	motors [4]domain.IMotor
+	registry domain.IMotorRegistry
 }
 
-func NewMoveSingleMotor(motors [4]domain.IMotor) *MoveSingleMotor {
-	return &MoveSingleMotor{motors: motors}
+func NewMoveSingleMotor(registry domain.IMotorRegistry) *MoveSingleMotor {
+	return &MoveSingleMotor{registry: registry}
 }
 
 func (uc *MoveSingleMotor) Execute(ctx context.Context, motorID int, steps int, speedHz float64) error {
@@ -20,5 +20,9 @@ func (uc *MoveSingleMotor) Execute(ctx context.Context, motorID int, steps int, 
 	if idx < 0 || idx >= 4 {
 		return fmt.Errorf("invalid motor id %d, must be 1-4", motorID)
 	}
-	return uc.motors[idx].Move(ctx, steps, speedHz)
+	motors := uc.registry.Motors()
+	if motors[idx] == nil {
+		return fmt.Errorf("motor %d offline", motorID)
+	}
+	return motors[idx].Move(ctx, steps, speedHz)
 }

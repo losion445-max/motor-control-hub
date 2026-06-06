@@ -40,3 +40,8 @@ type IMotorDispatcher interface {
 	Dispatch(ctx context.Context, ticks []Tick) error
 	StopAll(ctx context.Context) error
 }
+
+type IMotorRegistry interface {
+	Motors() [4]IMotor
+	AllOnline() bool
+}

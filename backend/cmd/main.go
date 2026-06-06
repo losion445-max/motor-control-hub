@@ -16,38 +16,34 @@ import (
 )
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
 	log.Println("[MAIN] Starting Motor Control Hub...")
 
+	// 1. конфиг
 	cfg := &config.GlobalConfig{}
 	cfg.Kinematics.Width = 1000.0
 	cfg.Kinematics.Height = 1000.0
 	cfg.Kinematics.Diameter = 90.0
 	cfg.Kinematics.StepsPerRev = 10000
 
+	// 2. registry — стартует сразу, моторы подключаются в фоне
 	scanner := network.NewARPScanner("wlan1", 500*time.Millisecond)
-	motorSlice, err := usecase.BootstrapMotors(ctx, scanner, esp32.NewMotorClientFactory())
-	if err != nil {
-		log.Fatalf("[MAIN] Failed to bootstrap motors: %v", err)
-	}
-
-	var motors [4]domain.IMotor
-	copy(motors[:], motorSlice)
+	registry := network.NewMotorRegistry(scanner, func(cfg domain.MotorConfig) domain.IMotor {
+		return esp32.NewMotorClient(&cfg)
+	})
+	go registry.Run(context.Background())
 
 	zone := domain.WorkZone{
 		Width:  cfg.Kinematics.Width,
 		Height: cfg.Kinematics.Height,
 	}
 
+	defaultMotorConfig := domain.MotorConfig{
+		StepsPerRev: cfg.Kinematics.StepsPerRev,
+		PulleyMM:    cfg.Kinematics.Diameter,
+	}
 	var motorConfigs [4]domain.MotorConfig
-	for i := range motors {
-		mc, err := motors[i].GetConfig(ctx)
-		if err != nil {
-			log.Fatalf("[MAIN] Failed to get config from motor %d: %v", i+1, err)
-		}
-		motorConfigs[i] = *mc
+	for i := range motorConfigs {
+		motorConfigs[i] = defaultMotorConfig
 	}
 
 	controller, err := kinematics.NewKinematicsController(zone, motorConfigs)
@@ -56,19 +52,18 @@ func main() {
 	}
 
 	planner := kinematics.NewTrajectoryPlanner(kinematics.DefaultHz, kinematics.DefaultAccelMmS2)
-	dispatcher := infrastructure.NewMotorDispatcher(motors)
+	dispatcher := infrastructure.NewMotorDispatcher(registry)
 
 	// 4. юзкейсы
-	moveTo := usecase.NewMoveTo(planner, controller, dispatcher)
+	moveTo := usecase.NewMoveTo(planner, controller, dispatcher, registry)
 	setHome := usecase.NewSetHome(controller)
 	stopAll := usecase.NewStopAll(dispatcher)
-	getStatus := usecase.NewGetStatus(motors, controller)
-	setEnabled := usecase.NewSetEnabled(motors)
-	moveSingleMotor := usecase.NewMoveSingleMotor(motors)
-	getConfig := usecase.NewGetConfig(cfg, motors)
+	getStatus := usecase.NewGetStatus(registry, controller)
+	setEnabled := usecase.NewSetEnabled(registry)
+	moveSingleMotor := usecase.NewMoveSingleMotor(registry)
+	getConfig := usecase.NewGetConfig(cfg, registry)
 	updateConfig := usecase.NewUpdateConfig(cfg, controller)
 
-	// 5. HTTP
 	mux := http.NewServeMux()
 	handler := network.NewMotorHandler(
 		moveTo,

@@ -7,15 +7,16 @@ import (
 	"time"
 
 	"github.com/losion445-max/motor-control-hub/internal/domain"
+	"github.com/losion445-max/motor-control-hub/internal/infrastructure/network"
 	"github.com/losion445-max/motor-control-hub/internal/kinematics"
 )
 
 type MotorDispatcher struct {
-	motors [4]domain.IMotor
+	registry *network.MotorRegistry
 }
 
-func NewMotorDispatcher(motors [4]domain.IMotor) *MotorDispatcher {
-	return &MotorDispatcher{motors: motors}
+func NewMotorDispatcher(registry *network.MotorRegistry) *MotorDispatcher {
+	return &MotorDispatcher{registry: registry}
 }
 
 func (d *MotorDispatcher) Dispatch(ctx context.Context, ticks []domain.Tick) error {
@@ -28,7 +29,6 @@ func (d *MotorDispatcher) Dispatch(ctx context.Context, ticks []domain.Tick) err
 			return ctx.Err()
 		case <-ticker.C:
 			if err := d.sendTick(ctx, tick); err != nil {
-
 				_ = d.StopAll(context.Background())
 				return err
 			}
@@ -38,17 +38,22 @@ func (d *MotorDispatcher) Dispatch(ctx context.Context, ticks []domain.Tick) err
 }
 
 func (d *MotorDispatcher) sendTick(ctx context.Context, tick domain.Tick) error {
-	ready := make(chan struct{})
+	motors := d.registry.Motors()
 
+	ready := make(chan struct{})
 	var wg sync.WaitGroup
 	errs := make(chan error, 4)
 
-	for i := range 4 {
+	for i := 0; i < 4; i++ {
 		wg.Add(1)
 		go func(idx int, cmd domain.MotorCommand) {
 			defer wg.Done()
 			<-ready
-			if err := d.motors[idx].Move(ctx, cmd.Steps, cmd.Hz); err != nil {
+			if motors[idx] == nil {
+				errs <- fmt.Errorf("motor %d is nil", idx+1)
+				return
+			}
+			if err := motors[idx].Move(ctx, cmd.Steps, cmd.Hz); err != nil {
 				errs <- fmt.Errorf("motor %d: %w", cmd.MotorID, err)
 			}
 		}(i, tick[i])
@@ -68,17 +73,22 @@ func (d *MotorDispatcher) sendTick(ctx context.Context, tick domain.Tick) error 
 }
 
 func (d *MotorDispatcher) StopAll(ctx context.Context) error {
+	motors := d.registry.Motors()
+
 	var wg sync.WaitGroup
 	errs := make(chan error, 4)
 
-	for i := range 4 {
+	for i := 0; i < 4; i++ {
 		wg.Add(1)
-		go func(m domain.IMotor) {
+		go func(idx int) {
 			defer wg.Done()
-			if err := m.Stop(ctx); err != nil {
+			if motors[idx] == nil {
+				return
+			}
+			if err := motors[idx].Stop(ctx); err != nil {
 				errs <- err
 			}
-		}(d.motors[i])
+		}(i)
 	}
 
 	wg.Wait()

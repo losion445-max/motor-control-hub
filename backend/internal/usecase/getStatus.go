@@ -9,9 +9,9 @@ import (
 )
 
 type MotorStatusResult struct {
-	MotorID int
-	Status  *domain.MotorStatus
-	Err     error
+	MotorID int                 `json:"motor_id"`
+	Status  *domain.MotorStatus `json:"status"`
+	Err     string              `json:"error,omitempty"`
 }
 
 type StatusResult struct {
@@ -22,48 +22,42 @@ type StatusResult struct {
 }
 
 type GetStatus struct {
-	motors     [4]domain.IMotor
+	registry   domain.IMotorRegistry
 	kinematics domain.IKinematicsController
 }
 
-func NewGetStatus(motors [4]domain.IMotor, kinematics domain.IKinematicsController) *GetStatus {
-	return &GetStatus{motors: motors, kinematics: kinematics}
+func NewGetStatus(registry domain.IMotorRegistry, kinematics domain.IKinematicsController) *GetStatus {
+	return &GetStatus{registry: registry, kinematics: kinematics}
 }
 
 func (uc *GetStatus) Execute(ctx context.Context) (StatusResult, error) {
-	var (
-		wg      sync.WaitGroup
-		results [4]MotorStatusResult
-	)
+	motors := uc.registry.Motors()
+	var wg sync.WaitGroup
+	var results [4]MotorStatusResult
 
 	for i := 0; i < 4; i++ {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			status, err := uc.motors[idx].GetStatus(ctx)
-			results[idx] = MotorStatusResult{
-				MotorID: idx + 1,
-				Status:  status,
-				Err:     err,
+			if motors[idx] == nil {
+				results[idx] = MotorStatusResult{MotorID: idx + 1, Err: "offline"}
+				return
 			}
+			status, err := motors[idx].GetStatus(ctx)
+			if err != nil {
+				results[idx] = MotorStatusResult{MotorID: idx + 1, Err: err.Error()}
+				return
+			}
+			results[idx] = MotorStatusResult{MotorID: idx + 1, Status: status}
 		}(i)
 	}
+
 	wg.Wait()
-
-	var firstErr error
-	for _, r := range results {
-		if r.Err != nil {
-			firstErr = r.Err
-			break
-		}
-	}
-
 	pos := uc.kinematics.CurrentPosition()
-
 	return StatusResult{
 		Timestamp:    time.Now().UnixMilli(),
 		Position:     pos,
 		IsCalibrated: pos != (domain.Point2D{}),
 		Motors:       results,
-	}, firstErr
+	}, nil
 }
