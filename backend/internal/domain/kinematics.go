@@ -30,8 +30,9 @@ type ITrajectoryPlanner interface {
 // Motor commands for 1 ppoint
 type IKinematicsController interface {
 	Solve(next Point2D) (Tick, error)
-	SetHome()
+	SetHome(pos Point2D)
 	CurrentPosition() Point2D
+	SetWorkZone(zone WorkZone)
 }
 
 // Put tick for all esp32
