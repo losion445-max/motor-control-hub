@@ -18,7 +18,7 @@ func (h *MotorHandler) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, struct {
 		Timestamp    int64                 `json:"timestamp"`
-		Position     domain.Point          `json:"position"`
+		Position     domain.Point2D        `json:"position"`
 		Motors       []*domain.MotorStatus `json:"motors"`
 		IsCalibrated bool                  `json:"is_calibrated"`
 	}{

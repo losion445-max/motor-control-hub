@@ -87,11 +87,11 @@ func (orc *MotorOrchestrator) SetMotorsEnabled(ctx context.Context, enabled bool
 }
 
 func (orc *MotorOrchestrator) ManualSyncPosition(x, y float64) {
-	orc.kinematics.SetCurrentPosition(domain.Point{X: x, Y: y})
+	orc.kinematics.SetCurrentPosition(domain.Point2D{X: x, Y: y})
 }
 
 func (m *MotorOrchestrator) MoveToPoint(ctx context.Context, x, y, speed float64) error {
-	return m.kinematics.MoveTo(ctx, domain.Point{X: x, Y: y}, speed)
+	return m.kinematics.MoveTo(ctx, domain.Point2D{X: x, Y: y}, speed)
 }
 
 func (m *MotorOrchestrator) EmergencyStop(ctx context.Context) error {
@@ -102,14 +102,14 @@ func (m *MotorOrchestrator) Calibrate(ctx context.Context, speed float64) error 
 	return m.kinematics.Calibrate(ctx, speed)
 }
 
-func (m *MotorOrchestrator) GetCurrentPosition() domain.Point {
+func (m *MotorOrchestrator) GetCurrentPosition() domain.Point2D {
 	m.kinematics.mu.RLock()
 	defer m.kinematics.mu.RUnlock()
 	return m.kinematics.currentPosition
 }
 
 func (m *MotorOrchestrator) GoHome(ctx context.Context, speed float64) error {
-	return m.kinematics.MoveTo(ctx, domain.Point{X: 0, Y: 0}, speed)
+	return m.kinematics.MoveTo(ctx, domain.Point2D{X: 0, Y: 0}, speed)
 }
 
 func (m *MotorOrchestrator) GetConfig() *config.GlobalConfig {
@@ -121,5 +121,5 @@ func (m *MotorOrchestrator) Sync() {
 }
 
 func (m *MotorOrchestrator) IsCalibrated() bool {
-	return m.kinematics.currentPosition != (domain.Point{})
+	return m.kinematics.currentPosition != (domain.Point2D{})
 }
