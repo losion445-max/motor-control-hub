@@ -113,3 +113,21 @@ func (r *MotorRegistry) healthCheck(ctx context.Context) {
 		}
 	}
 }
+
+func (r *MotorRegistry) Register(motorID int, motor domain.IMotor) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	idx := motorID - 1
+	r.motors[idx] = motor
+	r.online[idx] = true
+	log.Printf("[REGISTRY] Motor %d registered via TCP", motorID)
+}
+
+func (r *MotorRegistry) Unregister(motorID int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	idx := motorID - 1
+	r.motors[idx] = nil
+	r.online[idx] = false
+	log.Printf("[REGISTRY] Motor %d unregistered", motorID)
+}

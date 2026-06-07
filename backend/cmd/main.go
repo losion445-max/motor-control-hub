@@ -18,19 +18,25 @@ import (
 func main() {
 	log.Println("[MAIN] Starting Motor Control Hub...")
 
-	// 1. конфиг
 	cfg := &config.GlobalConfig{}
-	cfg.Kinematics.Width = 1000.0
-	cfg.Kinematics.Height = 1000.0
-	cfg.Kinematics.Diameter = 90.0
+	cfg.Kinematics.Width = 1400.0
+	cfg.Kinematics.Height = 2400.0
+	cfg.Kinematics.Diameter = 70.0
 	cfg.Kinematics.StepsPerRev = 10000
 
-	// 2. registry — стартует сразу, моторы подключаются в фоне
 	scanner := network.NewARPScanner("wlan1", 500*time.Millisecond)
 	registry := network.NewMotorRegistry(scanner, func(cfg domain.MotorConfig) domain.IMotor {
 		return esp32.NewMotorClient(&cfg)
 	})
+
 	go registry.Run(context.Background())
+
+	tcpServer := network.NewTCPServer(":9000", registry)
+	go func() {
+		if err := tcpServer.Run(context.Background()); err != nil {
+			log.Printf("[TCP] Server error: %v", err)
+		}
+	}()
 
 	zone := domain.WorkZone{
 		Width:  cfg.Kinematics.Width,
@@ -41,12 +47,14 @@ func main() {
 		StepsPerRev: cfg.Kinematics.StepsPerRev,
 		PulleyMM:    cfg.Kinematics.Diameter,
 	}
+
 	var motorConfigs [4]domain.MotorConfig
 	for i := range motorConfigs {
 		motorConfigs[i] = defaultMotorConfig
 	}
 
 	controller, err := kinematics.NewKinematicsController(zone, motorConfigs)
+	controller.SetHome(domain.Point2D{0.0, 0.0})
 	if err != nil {
 		log.Fatalf("[MAIN] Failed to init kinematics controller: %v", err)
 	}
@@ -54,7 +62,6 @@ func main() {
 	planner := kinematics.NewTrajectoryPlanner(kinematics.DefaultHz, kinematics.DefaultAccelMmS2)
 	dispatcher := infrastructure.NewMotorDispatcher(registry)
 
-	// 4. юзкейсы
 	moveTo := usecase.NewMoveTo(planner, controller, dispatcher, registry)
 	setHome := usecase.NewSetHome(controller)
 	stopAll := usecase.NewStopAll(dispatcher)
