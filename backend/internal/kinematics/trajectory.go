@@ -10,7 +10,9 @@ import (
 
 const (
 	DefaultHz        = 50.0
-	DefaultAccelMmS2 = 300.0
+	DefaultAccelMmS2 = 50.0
+
+	MinSpeedMmS = 5.0
 )
 
 type TrajectoryPlanner struct {
@@ -68,6 +70,10 @@ func (p *TrajectoryPlanner) Plan(from, to domain.Point2D, speedMmS float64) ([]d
 		}
 	}
 
+	if len(points) > 0 {
+		points[len(points)-1] = to
+	}
+
 	log.Printf("[Planner] Successfully generated %d path points", len(points))
 	return points, nil
 }
@@ -98,14 +104,18 @@ func (p *TrajectoryPlanner) trapezoidSpeeds(distance, maxSpeed float64) []float6
 		case pos < accelDist+cruiseDist:
 			vel = maxSpeed
 		default:
-			vel = math.Max(vel-a*dt, 0.1)
+			vel = math.Max(vel-a*dt, MinSpeedMmS)
 		}
 
 		remaining := distance - pos
+
 		if remaining <= vel*dt {
 			vel = remaining / dt
-			pos += vel * dt
-			speeds = append(speeds, vel)
+
+			if remaining > 0.01 {
+				pos += vel * dt
+				speeds = append(speeds, vel)
+			}
 			break
 		}
 

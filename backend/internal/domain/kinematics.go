@@ -18,8 +18,10 @@ type MotorCommand struct {
 type Tick [4]MotorCommand
 
 type WorkZone struct {
-	Width  float64 // mm
-	Height float64 // mm
+	Width   float64 // mm
+	Height  float64 // mm
+	Margin  float64 // mm
+	ZOffset float64 // mm
 }
 
 // Split path in many pieces

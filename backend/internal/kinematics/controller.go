@@ -68,11 +68,22 @@ func (c *KinematicsController) Solve(next domain.Point2D) (domain.Tick, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	if next.X < c.zone.Margin || next.X > (c.zone.Width-c.zone.Margin) ||
+		next.Y < c.zone.Margin || next.Y > (c.zone.Height-c.zone.Margin) {
+		return domain.Tick{}, fmt.Errorf("target (%.2f, %.2f) out of safe workspace", next.X, next.Y)
+	}
+
 	targetMM := c.ik(next)
 	var tick domain.Tick
 
 	for i := range 4 {
 		deltaMM := targetMM[i] - c.currentMM[i]
+
+		maxDelta := 5.0
+		if math.Abs(deltaMM) > maxDelta {
+			deltaMM = math.Copysign(maxDelta, deltaMM)
+		}
+
 		steps := int(math.Round(deltaMM * c.stepsPerMM[i]))
 		hz := math.Abs(float64(steps)) * DefaultHz
 		if hz > MaxMotorHz {
@@ -96,11 +107,12 @@ func (c *KinematicsController) Solve(next domain.Point2D) (domain.Tick, error) {
 func (c *KinematicsController) ik(p domain.Point2D) [4]float64 {
 	x, y := p.X, p.Y
 	w, h := c.zone.Width, c.zone.Height
+
 	return [4]float64{
-		math.Sqrt(x*x + y*y),
-		math.Sqrt((w-x)*(w-x) + y*y),
-		math.Sqrt((w-x)*(w-x) + (h-y)*(h-y)),
-		math.Sqrt(x*x + (h-y)*(h-y)),
+		math.Sqrt(x*x + y*y + c.zone.ZOffset*c.zone.ZOffset),
+		math.Sqrt((w-x)*(w-x) + y*y + c.zone.ZOffset*c.zone.ZOffset),
+		math.Sqrt((w-x)*(w-x) + (h-y)*(h-y) + c.zone.ZOffset*c.zone.ZOffset),
+		math.Sqrt(x*x + (h-y)*(h-y) + c.zone.ZOffset*c.zone.ZOffset),
 	}
 }
 

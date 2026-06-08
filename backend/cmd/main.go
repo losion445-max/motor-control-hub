@@ -21,7 +21,7 @@ func main() {
 	cfg := &config.GlobalConfig{}
 	cfg.Kinematics.Width = 1400.0
 	cfg.Kinematics.Height = 2400.0
-	cfg.Kinematics.Diameter = 70.0
+	cfg.Kinematics.Diameter = 68.7
 	cfg.Kinematics.StepsPerRev = 10000
 
 	scanner := network.NewARPScanner("wlan1", 500*time.Millisecond)
@@ -39,8 +39,10 @@ func main() {
 	}()
 
 	zone := domain.WorkZone{
-		Width:  cfg.Kinematics.Width,
-		Height: cfg.Kinematics.Height,
+		Width:   cfg.Kinematics.Width,
+		Height:  cfg.Kinematics.Height,
+		Margin:  150,
+		ZOffset: 100,
 	}
 
 	defaultMotorConfig := domain.MotorConfig{
@@ -54,7 +56,7 @@ func main() {
 	}
 
 	controller, err := kinematics.NewKinematicsController(zone, motorConfigs)
-	controller.SetHome(domain.Point2D{0.0, 0.0})
+	controller.SetHome(domain.Point2D{700.0, 1200.0})
 	if err != nil {
 		log.Fatalf("[MAIN] Failed to init kinematics controller: %v", err)
 	}
