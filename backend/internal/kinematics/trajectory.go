@@ -10,7 +10,7 @@ import (
 
 const (
 	DefaultHz        = 50.0
-	DefaultAccelMmS2 = 50.0
+	DefaultAccelMmS2 = 200.0
 
 	MinSpeedMmS = 5.0
 )
@@ -44,7 +44,7 @@ func (p *TrajectoryPlanner) Plan(from, to domain.Point2D, speedMmS float64) ([]d
 	log.Printf("[Planner] Planning path: (%.2f, %.2f) -> (%.2f, %.2f), Dist=%.2fmm, Speed=%.2fmm/s",
 		from.X, from.Y, to.X, to.Y, distance, speedMmS)
 
-	if distance < 0.1 {
+	if distance < 0.01 {
 		log.Printf("[Planner] Distance too small, skipping")
 		return nil, nil
 	}

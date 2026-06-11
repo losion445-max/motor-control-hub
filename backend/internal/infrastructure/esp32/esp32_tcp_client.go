@@ -67,7 +67,7 @@ func (c *EspMotorTCPClient) ReadLoop(ctx context.Context) {
 func (c *EspMotorTCPClient) Move(ctx context.Context, steps int, speedHz float64) error {
 	buf := make([]byte, domain.PacketMove)
 	buf[0] = domain.CmdMove
-	copy(buf[1:5], int32ToBytes(int32(-steps)))
+	copy(buf[1:5], int32ToBytes(int32(steps)))
 	copy(buf[5:9], float32ToBytes(float32(speedHz)))
 	buf[9] = domain.Checksum(buf[:9])
 

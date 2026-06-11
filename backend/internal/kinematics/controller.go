@@ -68,8 +68,7 @@ func (c *KinematicsController) Solve(next domain.Point2D) (domain.Tick, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if next.X < c.zone.Margin || next.X > (c.zone.Width-c.zone.Margin) ||
-		next.Y < c.zone.Margin || next.Y > (c.zone.Height-c.zone.Margin) {
+	if next.X > (c.zone.Width) || next.Y > (c.zone.Height) {
 		return domain.Tick{}, fmt.Errorf("target (%.2f, %.2f) out of safe workspace", next.X, next.Y)
 	}
 

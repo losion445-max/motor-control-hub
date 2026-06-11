@@ -19,8 +19,8 @@ func main() {
 	log.Println("[MAIN] Starting Motor Control Hub...")
 
 	cfg := &config.GlobalConfig{}
-	cfg.Kinematics.Width = 1400.0
-	cfg.Kinematics.Height = 2400.0
+	cfg.Kinematics.Width = 1200.0 
+	cfg.Kinematics.Height = 2400
 	cfg.Kinematics.Diameter = 68.7
 	cfg.Kinematics.StepsPerRev = 10000
 
@@ -42,7 +42,7 @@ func main() {
 		Width:   cfg.Kinematics.Width,
 		Height:  cfg.Kinematics.Height,
 		Margin:  150,
-		ZOffset: 100,
+		ZOffset: 200,
 	}
 
 	defaultMotorConfig := domain.MotorConfig{
@@ -56,7 +56,7 @@ func main() {
 	}
 
 	controller, err := kinematics.NewKinematicsController(zone, motorConfigs)
-	controller.SetHome(domain.Point2D{700.0, 1200.0})
+	controller.SetHome(domain.Point2D{X: 0.0, Y: 0.0})
 	if err != nil {
 		log.Fatalf("[MAIN] Failed to init kinematics controller: %v", err)
 	}
